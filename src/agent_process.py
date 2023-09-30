@@ -60,8 +60,8 @@ from langchain.chains import SimpleSequentialChain
 import random
 
 herd_llm = ChatOpenAI(temperature=0.7)
-chameleon_llm = ChatOpenAI(temperature=0.4)
-decision_llm = ChatOpenAI(temperature=0)
+chameleon_llm = ChatOpenAI(model='gpt-4', temperature=0.4)
+decision_llm = ChatOpenAI(model='gpt-4', temperature=0)
 
 # Game Setup
 NUM_PLAYERS = 5
@@ -71,7 +71,7 @@ selected_animal = random.choice(ANIMALS)
 selected_chameleon = random.randint(0, NUM_PLAYERS - 1)
 
 print(f'Animal: {selected_animal}')
-print(f'Chameleon: Player {selected_chameleon}')
+print(f'Chameleon: Player {selected_chameleon+1}')
 
 GAME_RULES = '''\
 GAME RULES: You are playing a social deduction game where every player pretends the be the same animal. The players go around the room and make an "I"-statement as if they were the animal. All players know what animal they are pretending to be, except one who is known as the Chameleon. The Chameleon and must blend in by providing details about the animal using context from other players. The other players must be careful not to give away too much information with their responses so that Chameleon cannot guess the animal. After all players have spoken, they vote on who they think the Chameleon is. If the other players vote for the Chameleon, they win the game. If they vote for the wrong player then the Chameleon wins the game. 
@@ -107,18 +107,19 @@ chameleon_chain = LLMChain(llm=chameleon_llm, prompt=chameleon_prompt_template)
 player_responses = []
 for i in range(0, NUM_PLAYERS):
     if i == selected_chameleon:
-        player_responses.append(chameleon_chain.run(player_responses=player_responses))
+        player_response = chameleon_chain.run(player_responses=player_responses)
     else:
-        player_responses.append(herd_chain.run(animal=selected_animal, player_responses=player_responses))
-    print(f"Player {i}: {player_responses[i]}")
-    player_responses[i] = f"Player {i}: {player_responses[i]}"
+        player_response = herd_chain.run(animal=selected_animal, player_responses=player_responses)
+    # Nicely Formatted Responses
+    player_responses.append(f"Player {i + 1}: {player_response}")
+    print(player_responses[i])
 
 
-formatted_player_response = '\n-'.join(player_responses)
+formatted_player_response = '\n- '.join(player_responses)
 
 VOTING_PROMPT = f"""You are playing a game called Chameleon. In this game, there are {NUM_PLAYERS} players. {NUM_PLAYERS-1} of them are all the same animal. 1 player is a different animal who is pretending to be the same animal as everyone else. You are the judge of this game. Each player has said a sentence describing themselves. Use these descriptions to decide which player is most likely not describing the same animal as everyone else. 
 Player responses: 
--{formatted_player_response}
+- {formatted_player_response}
 
 Please vote for the player you think is most likely to be the Chameleon.
 """
@@ -128,28 +129,33 @@ print(VOTING_PROMPT)
 # election = [0*NUM_PLAYERS]
 
 # Tools
-def vote(player: str) -> str:
-    """Votes for a player."""
-    print(f"A player has voted for {player}")
+LIKELY_ANIMALS_PROMPT = """Given the following description of an animal, return a list of animals that may correspond to it and the approximate probalities of each. 
+Animal Description:
+{animal_description}
+Likely Animals:
+"""
 
-#https://python.langchain.com/docs/modules/agents/agent_types/react
-    # try:
-    #     election[player] += 1
-    #     return f"You successfully voted for {player}"
-    # except KeyError:
-    #     return f"{player} is not a valid option on this ballot, please try again"
+likely_animals_prompt = PromptTemplate(
+    input_variables=['animal_description'],
+    template=LIKELY_ANIMALS_PROMPT
+)
 
+likely_animals_chain = LLMChain(llm=decision_llm, prompt=likely_animals_prompt)
+
+def get_likely_animals(description: str) -> str:
+    """Provides animals from a description"""
+    return likely_animals_chain.run(animal_description=description)
 
 tools = [
     Tool(
-        name='Vote',
-        func=vote,
-        description='used to cast a vote for who you think is the Chameleon'
+        name='get_likely_animals',
+        func=get_likely_animals,
+        description='used to get a list of potential animals corresponding to a description of an animal'
     )
 ]
 
-# voting_agent_executor = initialize_agent(tools, decision_llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
-# voting_agent_executor.invoke({"input": VOTING_PROMPT})
+voting_agent_executor = initialize_agent(tools, decision_llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
+voting_agent_executor.invoke({"input": VOTING_PROMPT})
 
 
 # # This is an LLMChain to write a synopsis given a title of a play and the era it is set in.
@@ -181,39 +187,39 @@ tools = [
 #     output_variables=["synopsis", "review"],
 #     verbose=True)
 
-
-#BABYAGI
-import os
-from collections import deque
-from typing import Dict, List, Optional, Any
-
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
-from langchain.embeddings import OpenAIEmbeddings
-# from langchain.llms import BaseLLM
-# from langchain.schema.vectorstore import VectorStore
-# from pydantic import BaseModel, Field
-# from langchain.chains.base import Chain
-from langchain_experimental.autonomous_agents import BabyAGI
-
-from langchain.vectorstores import FAISS
-from langchain.docstore import InMemoryDocstore
-# Define your embedding model
-embeddings_model = OpenAIEmbeddings()
-# Initialize the vectorstore as empty
-import faiss
-
-embedding_size = 1536
-index = faiss.IndexFlatL2(embedding_size)
-vectorstore = FAISS(embeddings_model.embed_query, index, InMemoryDocstore({}), {})
-llm = ChatOpenAI(model='gpt-4', temperature=0)
-
-# Logging of LLMChains
-verbose = False
-# If None, will keep going on forever
-max_iterations = 10
-baby_agi = BabyAGI.from_llm(
-    llm=llm, vectorstore=vectorstore, verbose=verbose, max_iterations=max_iterations
-)
-
-baby_agi({"objective": VOTING_PROMPT})
+#
+# #BABYAGI
+# import os
+# from collections import deque
+# from typing import Dict, List, Optional, Any
+#
+# from langchain.chains import LLMChain
+# from langchain.prompts import PromptTemplate
+# from langchain.embeddings import OpenAIEmbeddings
+# # from langchain.llms import BaseLLM
+# # from langchain.schema.vectorstore import VectorStore
+# # from pydantic import BaseModel, Field
+# # from langchain.chains.base import Chain
+# from langchain_experimental.autonomous_agents import BabyAGI
+#
+# from langchain.vectorstores import FAISS
+# from langchain.docstore import InMemoryDocstore
+# # Define your embedding model
+# embeddings_model = OpenAIEmbeddings()
+# # Initialize the vectorstore as empty
+# import faiss
+#
+# embedding_size = 1536
+# index = faiss.IndexFlatL2(embedding_size)
+# vectorstore = FAISS(embeddings_model.embed_query, index, InMemoryDocstore({}), {})
+# llm = ChatOpenAI(model='gpt-4', temperature=0)
+#
+# # Logging of LLMChains
+# verbose = False
+# # If None, will keep going on forever
+# max_iterations = 10
+# baby_agi = BabyAGI.from_llm(
+#     llm=llm, vectorstore=vectorstore, verbose=verbose, max_iterations=max_iterations
+# )
+#
+# baby_agi({"objective": VOTING_PROMPT})
