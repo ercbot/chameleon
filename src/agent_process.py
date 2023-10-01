@@ -4,7 +4,10 @@
 """Beginning of the round:
 1. Assigned each player role
 2. determine the order in which the players will speak"""
+import json
+import re
 
+import regex
 
 """Describing Stage
 THOUGHT STEP
@@ -45,23 +48,20 @@ Provide:
 Output:
 - Another player's name as a choice of who to vote for e.g. Vote("Lisa")
 """
+import random
 
-
-from langchain.agents import load_tools
 from langchain.agents import initialize_agent
 from langchain.agents import AgentType
-from langchain.llms import OpenAI
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
-from langchain.tools import Tool
 from langchain.chains import LLMChain
-from langchain.chains import SimpleSequentialChain
 
-import random
+from reasoning_tools import tools
+
 
 herd_llm = ChatOpenAI(temperature=0.7)
 chameleon_llm = ChatOpenAI(model='gpt-4', temperature=0.4)
-decision_llm = ChatOpenAI(model='gpt-4', temperature=0)
+decision_llm = ChatOpenAI(model='gpt-4', temperature=1)
 
 # Game Setup
 NUM_PLAYERS = 5
@@ -100,14 +100,20 @@ chameleon_prompt_template = PromptTemplate(
 )
 
 # Game chains
+# Herd
 herd_chain = LLMChain(llm=herd_llm, prompt=herd_prompt_template)
-chameleon_chain = LLMChain(llm=chameleon_llm, prompt=chameleon_prompt_template)
+# Chameleon
+agent_executor = initialize_agent(tools, decision_llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
+
+
+# chameleon_chain = LLMChain(llm=chameleon_llm, prompt=chameleon_prompt_template)
 # chain = new_sequential_chain()
 
 player_responses = []
 for i in range(0, NUM_PLAYERS):
     if i == selected_chameleon:
-        player_response = chameleon_chain.run(player_responses=player_responses)
+        # player_response = chameleon_chain.run(player_responses=player_responses)
+        player_response = agent_executor.invoke({"input": chameleon_prompt_template.format_prompt(player_responses=player_responses)})['output']
     else:
         player_response = herd_chain.run(animal=selected_animal, player_responses=player_responses)
     # Nicely Formatted Responses
@@ -117,45 +123,30 @@ for i in range(0, NUM_PLAYERS):
 
 formatted_player_response = '\n- '.join(player_responses)
 
-VOTING_PROMPT = f"""You are playing a game called Chameleon. In this game, there are {NUM_PLAYERS} players. {NUM_PLAYERS-1} of them are all the same animal. 1 player is a different animal who is pretending to be the same animal as everyone else. You are the judge of this game. Each player has said a sentence describing themselves. Use these descriptions to decide which player is most likely not describing the same animal as everyone else. 
+JUDGE_PROMPT = f"""You are playing a game called Chameleon. In this game, there are {NUM_PLAYERS} players. {NUM_PLAYERS - 1} of them are all the same animal. 1 player is a different animal who is pretending to be the same animal as everyone else. You are the judge of this game. Each player has said a sentence describing themselves. Use these descriptions to decide which player is most likely not describing the same animal as everyone else. 
 Player responses: 
 - {formatted_player_response}
 
 Please vote for the player you think is most likely to be the Chameleon.
 """
 
-print(VOTING_PROMPT)
+print(JUDGE_PROMPT)
 
 # election = [0*NUM_PLAYERS]
 
-# Tools
-LIKELY_ANIMALS_PROMPT = """Given the following description of an animal, return a list of animals that may correspond to it and the approximate probalities of each. 
-Animal Description:
-{animal_description}
-Likely Animals:
-"""
+judge_response = agent_executor.invoke({"input": JUDGE_PROMPT})
 
-likely_animals_prompt = PromptTemplate(
-    input_variables=['animal_description'],
-    template=LIKELY_ANIMALS_PROMPT
-)
+with open("response.json", "w") as output_file:
+    judge = json.dumps(judge_response)
+    output_file.write(judge)
 
-likely_animals_chain = LLMChain(llm=decision_llm, prompt=likely_animals_prompt)
 
-def get_likely_animals(description: str) -> str:
-    """Provides animals from a description"""
-    return likely_animals_chain.run(animal_description=description)
-
-tools = [
-    Tool(
-        name='get_likely_animals',
-        func=get_likely_animals,
-        description='used to get a list of potential animals corresponding to a description of an animal'
-    )
-]
-
-voting_agent_executor = initialize_agent(tools, decision_llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
-voting_agent_executor.invoke({"input": VOTING_PROMPT})
+# Determine Winner
+herd_win = re.match(f"Player {selected_chameleon+1}", judge_response['output'])
+if herd_win:
+    print("The Herd has won!")
+else:
+    print("The Chameleon has won!")
 
 
 # # This is an LLMChain to write a synopsis given a title of a play and the era it is set in.
