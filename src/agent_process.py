@@ -4,8 +4,7 @@
 """Beginning of the round:
 1. Assigned each player role
 2. determine the order in which the players will speak"""
-import json
-import re
+
 
 import regex
 
@@ -49,19 +48,24 @@ Output:
 - Another player's name as a choice of who to vote for e.g. Vote("Lisa")
 """
 import random
+import json
+import re
+import uuid
 
 from langchain.agents import initialize_agent
 from langchain.agents import AgentType
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
 
 from reasoning_tools import tools
 
 
-herd_llm = ChatOpenAI(temperature=0.7)
-chameleon_llm = ChatOpenAI(model='gpt-4', temperature=0.4)
-decision_llm = ChatOpenAI(model='gpt-4', temperature=1)
+
+# All Players are the same Agent
+model_name = 'gpt-3.5-turbo'
+temperature = 1
+llm = ChatOpenAI(model=model_name, temperature=temperature)
+agent_executor = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
 
 # Game Setup
 NUM_PLAYERS = 5
@@ -74,17 +78,25 @@ print(f'Animal: {selected_animal}')
 print(f'Chameleon: Player {selected_chameleon+1}')
 
 GAME_RULES = '''\
-GAME RULES: You are playing a social deduction game where every player pretends the be the same animal. The players go around the room and make an "I"-statement as if they were the animal. All players know what animal they are pretending to be, except one who is known as the Chameleon. The Chameleon and must blend in by providing details about the animal using context from other players. The other players must be careful not to give away too much information with their responses so that Chameleon cannot guess the animal. After all players have spoken, they vote on who they think the Chameleon is. If the other players vote for the Chameleon, they win the game. If they vote for the wrong player then the Chameleon wins the game. 
+GAME RULES: You are playing a social deduction game where every player pretends the be the same animal. 
+During the round players go around the room and make an "I"-statement as if they were the animal. 
+All players know what animal they are pretending to be, except one who is known as the Chameleon. The Chameleon and must blend in by providing details about the animal using context from other players. 
+The other players must be careful not to give away too much information with their responses so that Chameleon cannot guess the animal. After all players have spoken, they vote on who they think the Chameleon is. 
+WIN CONDITION:
+- If the other players vote for the Chameleon, they win the game. 
+- If they vote for the wrong player then the Chameleon wins the game. 
 
 '''
 
-HERD_PROMPT = """You are a {animal}. In 10 words or less give a description of yourself starting with "I". Do not repeat responses from other players.
+HERD_PROMPT = """\
+You are a {animal}. In 10 words or less give a description of yourself starting with "I". The description should not give away too much information about the {animal} as you do not want the Chameleon to be able to guess what animal you are. Do not repeat responses from other players.
 Previously Mentioned Descriptions: 
 {player_responses}
 Your Response:
 """
 
-CHAMELEON_PROMPT = """You are the Chameleon. You don't know what animal the other players are. Using the context that they have provided, In 10 words or less give a description of yourself starting with "I". If no one else has said anything try to say something generic that could be true of any animals. 
+CHAMELEON_PROMPT = """\
+You are the Chameleon. Initially, you don't know what animal the other players are, your goal is to deduce . Using the context that they have provided, In 10 words or less give a description of yourself starting with "I". If no one else has said anything try to say something generic that could be true of any animals. 
 Previously Mentioned Descriptions:
 {player_responses}
 Your Response:
@@ -101,21 +113,18 @@ chameleon_prompt_template = PromptTemplate(
 
 # Game chains
 # Herd
-herd_chain = LLMChain(llm=herd_llm, prompt=herd_prompt_template)
-# Chameleon
-agent_executor = initialize_agent(tools, decision_llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
-
-
+# herd_chain = LLMChain(llm=herd_llm, prompt=herd_prompt_template)
 # chameleon_chain = LLMChain(llm=chameleon_llm, prompt=chameleon_prompt_template)
 # chain = new_sequential_chain()
 
 player_responses = []
 for i in range(0, NUM_PLAYERS):
     if i == selected_chameleon:
-        # player_response = chameleon_chain.run(player_responses=player_responses)
-        player_response = agent_executor.invoke({"input": chameleon_prompt_template.format_prompt(player_responses=player_responses)})['output']
+        prompt = chameleon_prompt_template.format_prompt(player_responses=player_responses)
+        player_response = agent_executor.invoke({"input": prompt})['output']
     else:
-        player_response = herd_chain.run(animal=selected_animal, player_responses=player_responses)
+        prompt = herd_prompt_template.format_prompt(animal=selected_animal, player_responses=player_responses)
+        player_response = agent_executor.invoke({"input": prompt})['output']
     # Nicely Formatted Responses
     player_responses.append(f"Player {i + 1}: {player_response}")
     print(player_responses[i])
@@ -136,9 +145,7 @@ print(JUDGE_PROMPT)
 
 judge_response = agent_executor.invoke({"input": JUDGE_PROMPT})
 
-with open("response.json", "w") as output_file:
-    judge = json.dumps(judge_response)
-    output_file.write(judge)
+
 
 
 # Determine Winner
@@ -147,6 +154,28 @@ if herd_win:
     print("The Herd has won!")
 else:
     print("The Chameleon has won!")
+
+
+# Save the experiment
+experiment_id = f"game-{uuid.uuid4().hex}"
+experiment = {
+    "experiment_id": experiment_id,
+    "chameleon_llm_parameters": {
+        "model_name": model_name,
+        "temperature": temperature
+    },
+    "herd_llm_parameters": {
+        "model_name": model_name,
+        "temperature": temperature
+    },
+    "player_agents": [
+
+    ],
+    "game_ruleset": game_ruleset,
+}
+
+with open(f"{experiment_id}.json", "w") as output_file:
+    output_file.write(json.dumps(experiment))
 
 
 # # This is an LLMChain to write a synopsis given a title of a play and the era it is set in.
