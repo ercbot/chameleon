@@ -4,9 +4,7 @@
 """Beginning of the round:
 1. Assigned each player role
 2. determine the order in which the players will speak"""
-
-
-import regex
+import os
 
 """Describing Stage
 THOUGHT STEP
@@ -60,12 +58,30 @@ from langchain.prompts import PromptTemplate
 from reasoning_tools import tools
 
 
+# LLM Configuration for each role
+# TODO: Agents keep throwing OutputParserExceptions can't parse output, need to look into this
+# Chameleon
+chameleon_llm_params = {
+    'model': 'gpt-3.5-turbo',
+    'temperature': 1
+}
+chameleon_llm = ChatOpenAI(**chameleon_llm_params)
+chameleon_agent = initialize_agent(tools, chameleon_llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True, return_intermediate_steps=True)
+# Herd
+herd_llm_params = {
+    'model': 'gpt-3.5-turbo',
+    'temperature': 1
+}
+herd_llm = ChatOpenAI(**herd_llm_params)
+herd_agent = initialize_agent(tools, chameleon_llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True, return_intermediate_steps=True)
+# Judge
+judge_llm_params = {
+    'model': 'gpt-3.5-turbo',
+    'temperature': 1
+}
+judge_llm = ChatOpenAI(**judge_llm_params)
+judge_agent = initialize_agent(tools, chameleon_llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
 
-# All Players are the same Agent
-model_name = 'gpt-3.5-turbo'
-temperature = 1
-llm = ChatOpenAI(model=model_name, temperature=temperature)
-agent_executor = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
 
 # Game Setup
 NUM_PLAYERS = 5
@@ -111,30 +127,55 @@ chameleon_prompt_template = PromptTemplate(
     template=GAME_RULES + CHAMELEON_PROMPT
 )
 
-# Game chains
-# Herd
-# herd_chain = LLMChain(llm=herd_llm, prompt=herd_prompt_template)
-# chameleon_chain = LLMChain(llm=chameleon_llm, prompt=chameleon_prompt_template)
-# chain = new_sequential_chain()
 
+# Game Round, all the players go around and describe the animal
 player_responses = []
+formatted_player_responses = ''
 for i in range(0, NUM_PLAYERS):
     if i == selected_chameleon:
-        prompt = chameleon_prompt_template.format_prompt(player_responses=player_responses)
-        player_response = agent_executor.invoke({"input": prompt})['output']
+        role = "chameleon"
+        prompt = chameleon_prompt_template.format_prompt(player_responses=formatted_player_responses)
+        response = chameleon_agent.invoke({"input": prompt})
     else:
-        prompt = herd_prompt_template.format_prompt(animal=selected_animal, player_responses=player_responses)
-        player_response = agent_executor.invoke({"input": prompt})['output']
-    # Nicely Formatted Responses
-    player_responses.append(f"Player {i + 1}: {player_response}")
-    print(player_responses[i])
+        role = "herd"
+        prompt = herd_prompt_template.format_prompt(animal=selected_animal, player_responses=formatted_player_responses)
+        response = herd_agent.invoke({"input": prompt})
+
+    # record thought process - TODO: make this into seperate func
+    intermediate_steps = []
+    if response['intermediate_steps']:
+        for step in response['intermediate_steps']:
+            intermediate_steps.append(
+                {
+                    "agent_action": {
+                        "tool": step[0].tool,
+                        "tool_input": step[0].tool_input,
+                        "log": step[0].log
+                    },
+                    "output": step[1]
+            }
+            )
 
 
-formatted_player_response = '\n- '.join(player_responses)
+    # Record the LLM Call
+    player_response = {
+        "name": f"Player {i+1}",
+        "role": role,
+        "prompt": prompt.to_string(),
+        "intermediate_steps": intermediate_steps,
+        "final_answer": response['output']
+    }
+
+    print(intermediate_steps)
+
+    player_responses.append(player_response)
+    # Nicely Formatted String of Responses
+    formatted_player_responses += f"- Player {i + 1}: {response['output']}\n"
+
 
 JUDGE_PROMPT = f"""You are playing a game called Chameleon. In this game, there are {NUM_PLAYERS} players. {NUM_PLAYERS - 1} of them are all the same animal. 1 player is a different animal who is pretending to be the same animal as everyone else. You are the judge of this game. Each player has said a sentence describing themselves. Use these descriptions to decide which player is most likely not describing the same animal as everyone else. 
 Player responses: 
-- {formatted_player_response}
+{formatted_player_responses}
 
 Please vote for the player you think is most likely to be the Chameleon.
 """
@@ -143,38 +184,34 @@ print(JUDGE_PROMPT)
 
 # election = [0*NUM_PLAYERS]
 
-judge_response = agent_executor.invoke({"input": JUDGE_PROMPT})
+judge_response = judge_agent.invoke({"input": JUDGE_PROMPT})
 
 
 
 
-# Determine Winner
+# Determine Winner - doesn't work because sometimes the judges final answer will mention multiple players...
 herd_win = re.match(f"Player {selected_chameleon+1}", judge_response['output'])
 if herd_win:
-    print("The Herd has won!")
+    winner = "Herd"
 else:
-    print("The Chameleon has won!")
+    winner = "Chameleon"
 
+print(f"The {winner} has won!")
 
 # Save the experiment
-experiment_id = f"game-{uuid.uuid4().hex}"
+game_ruleset = 'judge'
+experiment_id = f"{game_ruleset}-{uuid.uuid4().hex}"
 experiment = {
     "experiment_id": experiment_id,
-    "chameleon_llm_parameters": {
-        "model_name": model_name,
-        "temperature": temperature
-    },
-    "herd_llm_parameters": {
-        "model_name": model_name,
-        "temperature": temperature
-    },
-    "player_agents": [
-
-    ],
     "game_ruleset": game_ruleset,
+    "chameleon_llm_parameters": chameleon_llm_params,
+    "herd_llm_parameters": herd_llm_params,
+    "judge_llm_parameters": judge_llm_params,
+    "player_responses": player_responses
 }
 
-with open(f"{experiment_id}.json", "w") as output_file:
+experiment_path = os.path.join(os.pardir, 'experiments', f"{experiment_id}.json")
+with open(experiment_path, "w") as output_file:
     output_file.write(json.dumps(experiment))
 
 
