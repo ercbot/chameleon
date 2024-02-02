@@ -45,43 +45,19 @@ Provide:
 Output:
 - Another player's name as a choice of who to vote for e.g. Vote("Lisa")
 """
+
 import random
 import json
 import re
 import uuid
 
-from langchain.agents import initialize_agent
-from langchain.agents import AgentType
-from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
+from agents import PlayerAgent, llm_parameters
+from reasoning_tools import extract_vote
 
-from reasoning_tools import tools
-
-
-# LLM Configuration for each role
-# TODO: Agents keep throwing OutputParserExceptions can't parse output, need to look into this
-# Chameleon
-chameleon_llm_params = {
-    'model': 'gpt-3.5-turbo',
-    'temperature': 1
-}
-chameleon_llm = ChatOpenAI(**chameleon_llm_params)
-chameleon_agent = initialize_agent(tools, chameleon_llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True, return_intermediate_steps=True)
-# Herd
-herd_llm_params = {
-    'model': 'gpt-3.5-turbo',
-    'temperature': 1
-}
-herd_llm = ChatOpenAI(**herd_llm_params)
-herd_agent = initialize_agent(tools, chameleon_llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True, return_intermediate_steps=True)
-# Judge
-judge_llm_params = {
-    'model': 'gpt-3.5-turbo',
-    'temperature': 1
-}
-judge_llm = ChatOpenAI(**judge_llm_params)
-judge_agent = initialize_agent(tools, chameleon_llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
-
+chameleon_agent = PlayerAgent(role="chameleon")
+herd_agent = PlayerAgent(role="herd")
+judge_agent = PlayerAgent(role="judge")
 
 # Game Setup
 NUM_PLAYERS = 5
@@ -190,7 +166,11 @@ judge_response = judge_agent.invoke({"input": JUDGE_PROMPT})
 
 
 # Determine Winner - doesn't work because sometimes the judges final answer will mention multiple players...
-herd_win = re.match(f"Player {selected_chameleon+1}", judge_response['output'])
+player_vote = extract_vote(judge_response['output'])
+
+print(player_vote)
+
+herd_win = re.match(f"Player {selected_chameleon+1}".lower(), player_vote.lower())
 if herd_win:
     winner = "Herd"
 else:
@@ -199,84 +179,18 @@ else:
 print(f"The {winner} has won!")
 
 # Save the experiment
-game_ruleset = 'judge'
+game_ruleset = 'vote'
 experiment_id = f"{game_ruleset}-{uuid.uuid4().hex}"
 experiment = {
     "experiment_id": experiment_id,
     "game_ruleset": game_ruleset,
-    "chameleon_llm_parameters": chameleon_llm_params,
-    "herd_llm_parameters": herd_llm_params,
-    "judge_llm_parameters": judge_llm_params,
+    "chameleon_llm_parameters": llm_parameters['chameleon'],
+    "herd_llm_parameters": llm_parameters['herd'],
+    "judge_llm_parameters": llm_parameters['judge'],
     "player_responses": player_responses
 }
 
 experiment_path = os.path.join(os.pardir, 'experiments', f"{experiment_id}.json")
 with open(experiment_path, "w") as output_file:
-    output_file.write(json.dumps(experiment))
+    output_file.write(json.dumps(experiment, indent=4))
 
-
-# # This is an LLMChain to write a synopsis given a title of a play and the era it is set in.
-# llm = OpenAI(temperature=.7)
-# synopsis_template = """You are a playwright. Given the title of play and the era it is set in, it is your job to write a synopsis for that title.
-#
-# Title: {title}
-# Era: {era}
-# Playwright: This is a synopsis for the above play:"""
-# synopsis_prompt_template = PromptTemplate(input_variables=["title", "era"], template=synopsis_template)
-# synopsis_chain = LLMChain(llm=llm, prompt=synopsis_prompt_template, output_key="synopsis")
-#
-# # This is an LLMChain to write a review of a play given a synopsis.
-# llm = OpenAI(temperature=.7)
-# template = """You are a play critic from the New York Times. Given the synopsis of play, it is your job to write a review for that play.
-#
-# Play Synopsis:
-# {synopsis}
-# Review from a New York Times play critic of the above play:"""
-# prompt_template = PromptTemplate(input_variables=["synopsis"], template=template)
-# review_chain = LLMChain(llm=llm, prompt=prompt_template, output_key="review")
-#
-# # This is the overall chain where we run these two chains in sequence.
-# from langchain.chains import SequentialChain
-# overall_chain = SequentialChain(
-#     chains=[synopsis_chain, review_chain],
-#     input_variables=["era", "title"],
-#     # Here we return multiple variables
-#     output_variables=["synopsis", "review"],
-#     verbose=True)
-
-#
-# #BABYAGI
-# import os
-# from collections import deque
-# from typing import Dict, List, Optional, Any
-#
-# from langchain.chains import LLMChain
-# from langchain.prompts import PromptTemplate
-# from langchain.embeddings import OpenAIEmbeddings
-# # from langchain.llms import BaseLLM
-# # from langchain.schema.vectorstore import VectorStore
-# # from pydantic import BaseModel, Field
-# # from langchain.chains.base import Chain
-# from langchain_experimental.autonomous_agents import BabyAGI
-#
-# from langchain.vectorstores import FAISS
-# from langchain.docstore import InMemoryDocstore
-# # Define your embedding model
-# embeddings_model = OpenAIEmbeddings()
-# # Initialize the vectorstore as empty
-# import faiss
-#
-# embedding_size = 1536
-# index = faiss.IndexFlatL2(embedding_size)
-# vectorstore = FAISS(embeddings_model.embed_query, index, InMemoryDocstore({}), {})
-# llm = ChatOpenAI(model='gpt-4', temperature=0)
-#
-# # Logging of LLMChains
-# verbose = False
-# # If None, will keep going on forever
-# max_iterations = 10
-# baby_agi = BabyAGI.from_llm(
-#     llm=llm, vectorstore=vectorstore, verbose=verbose, max_iterations=max_iterations
-# )
-#
-# baby_agi({"objective": VOTING_PROMPT})
