@@ -1,4 +1,4 @@
-from prompts import fetch_prompt
+from game_utils import fetch_prompt
 
 class Player:
     def __init__(self, name: str, controller: str, role: str):

@@ -1,6 +1,25 @@
 """
-Prompts used for the game
+Utilities for the game including random selections and prompts.
 """
+import random
+
+
+def random_animal():
+    return random.choice(available_animals)
+
+
+available_animals = ["Giraffe", "Elephant", "Lion", "Zebra", "Monkey", "Gorilla"]
+
+
+def random_names(number_of_samples : int) -> list[str]:
+    return random.sample(available_names, number_of_samples)
+
+
+available_names = ["Jack", "Jill", "Bob", "Courtney", "Fizz", "Mallory"]
+
+
+def random_index(number_of_players : int) -> int:
+    return random.randint(0, number_of_players - 1)
 
 
 def fetch_prompt(prompt_name):
@@ -50,6 +69,6 @@ You are the Chameleon, vote for someone else to remove suspicion from yourself.
 prompts = {
     "herd_animal": game_rules + herd_animal,
     "chameleon_animal": game_rules + chameleon_animal,
-    "vote_prompt": vote_prompt
+    "vote": vote_prompt
 }
 
