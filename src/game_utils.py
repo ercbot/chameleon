@@ -38,14 +38,20 @@ WIN CONDITION:
 '''
 
 herd_animal = """\
-You are a {animal}. In 10 words or less give a description of yourself starting with "I". The description should not give away too much information about the {animal} as you do not want the Chameleon to be able to guess what animal you are. Do not repeat responses from other players.
+You are a {animal}, keep this a secret at all costs. 
+In 10 words or less give a description of yourself starting with "I". The description should not give away too much information about the {animal} as you do not want the Chameleon to be able to guess what animal you are. Do not repeat responses from other players.
+If the Chameleon can guess what animal you really are you will LOSE.
 Previously Mentioned Descriptions: 
 {player_responses}
 Your Response:
 """
 
 chameleon_animal = """\
-You are the Chameleon. Initially, you don't know what animal the other players are, your goal is to deduce . Using the context that they have provided, In 10 words or less give a description of yourself starting with "I". If no one else has said anything try to say something generic that could be true of any animals. 
+You are the Chameleon, keep this a secret at all costs. 
+You don't know what animal the other players are, your goal is to deduce it using the context they provide.
+Starting with "I" describe yourself in 10 words or less as if you are the same animal as the other players. 
+If no one else has said anything try to say something generic that could be true of any animals. 
+If the other players realize you are the Chameleon you will LOSE. 
 Previously Mentioned Descriptions:
 {player_responses}
 Your Response:
@@ -64,7 +70,6 @@ Who do you think the Chameleon is?
 chameleon_prompt = """\
 You are the Chameleon, vote for someone else to remove suspicion from yourself.
 """
-
 
 prompts = {
     "herd_animal": game_rules + herd_animal,
