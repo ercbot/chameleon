@@ -2,7 +2,11 @@ from game import Game
 from player import Player
 
 def main():
-    game = Game()
+    print("Please Enter your name:")
+    name = input()
+
+    game = Game(human_name=name)
+
     game.start()
 
 
