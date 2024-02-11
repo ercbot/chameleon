@@ -1,4 +1,5 @@
 from game import Game
+import asyncio
 from player import Player
 
 def main():
@@ -7,7 +8,7 @@ def main():
 
     game = Game(human_name=name)
 
-    game.start()
+    asyncio.run(game.start())
 
 
 if __name__ == "__main__":
