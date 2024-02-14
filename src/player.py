@@ -1,5 +1,10 @@
 import os
+import asyncio
+
 import openai
+from agents import LogMessagesKani
+from kani.engines.openai import OpenAIEngine
+
 
 # Using TGI Inference Endpoints from Hugging Face
 # api_type = "tgi"
@@ -15,40 +20,35 @@ else:
     model_name = "gpt-3.5-turbo"
     client = openai.Client()
 
+openai_engine = OpenAIEngine(model="gpt-3.5-turbo")
+
+
 class Player:
-    def __init__(self, name: str, controller: str, role: str):
+    def __init__(self, name: str, controller_type: str, role: str, log_filepath: str = None):
         self.name = name
-        self.controller = controller
+        self.controller = controller_type
+        if controller_type == "ai":
+            self.kani = LogMessagesKani(openai_engine, log_filepath=log_filepath)
+
         self.role = role
         self.messages = []
 
-    def collect_input(self, prompt: str) -> str:
-        """Store the input and output in the messages list. Return the output."""
-        self.messages.append({"role": "user", "content": prompt})
-        output = self.respond(prompt)
-        self.messages.append({"role": "assistant", "content": output})
+    async def respond_to(self, prompt: str) -> str:
+        """Makes the player respond to a prompt. Returns the response."""
+        # Generate a response from the controller
+        output = await self.__generate(prompt)
+
         return output
 
-    def respond(self, prompt: str) -> str:
+    async def __generate(self, prompt: str) -> str:
         if self.controller == "human":
             print(prompt)
             return input()
 
         elif self.controller == "ai":
-            chat_completion = client.chat.completions.create(
-                model=model_name,
-                messages=self.messages,
-                stream=False,
-            )
+            output = await self.kani.chat_round_str(prompt)
 
-            return chat_completion.choices[0].message.content
-
-
-    def add_message(self, message: str):
-        """Add a message to the messages list. No response required."""
-        self.messages.append({"role": "user", "content": message})
-
-
+            return output
 
 
 

@@ -1,34 +1,16 @@
-from langchain import hub
-from langchain.agents import AgentExecutor, create_openai_functions_agent
-from langchain_openai import ChatOpenAI
-
-from langchain.prompts import PromptTemplate
-from reasoning_tools import animal_tools, extract_vote
-
-# LLM Configuration for each role
-llm_parameters = {
-        "chameleon": {
-            'model': 'gpt-4-turbo-preview',
-            'temperature': 1
-        },
-        "herd": {
-            'model': 'gpt-3.5-turbo',
-            'temperature': 1
-        },
-        "judge": {
-            'model': 'gpt-3.5-turbo',
-            'temperature': 1
-        }
-}
-
-prompt = hub.pull("hwchase17/openai-functions-agent")
+from kani import Kani
 
 
-class PlayerAgent(AgentExecutor):
+class LogMessagesKani(Kani):
+    def __init__(self, engine, log_filepath: str = None,  *args, **kwargs):
+        super().__init__(engine, *args, **kwargs)
+        self.log_filepath = log_filepath
 
-    def __init__(self, role):
-        llm = ChatOpenAI(**llm_parameters[role])
+    async def add_to_history(self, message, *args, **kwargs):
+        await super().add_to_history(message, *args, **kwargs)
 
-        agent = create_openai_functions_agent(llm, animal_tools, prompt)
-
-        super().__init__(agent=agent, tools=animal_tools, verbose=True, return_intermediate_steps=True)
+        # Logs Message to File
+        if self.log_filepath:
+            with open(self.log_filepath, "a") as log_file:
+                log_file.write(message.model_dump_json())
+                log_file.write("\n")

@@ -2,9 +2,10 @@ from typing import Type
 import asyncio
 import json
 
-from kani import Kani
 from kani.engines.openai import OpenAIEngine
 from pydantic import BaseModel, ValidationError
+
+from agents import LogMessagesKani
 
 FORMAT_INSTRUCTIONS = """The output should be reformatted as a JSON instance that conforms to the JSON schema below.
 Here is the output schema:
@@ -24,7 +25,7 @@ Output:
 """
 
 
-class ParserKani(Kani):
+class ParserKani(LogMessagesKani):
     def __init__(self, engine, *args, **kwargs):
         super().__init__(engine, *args, **kwargs)
 
