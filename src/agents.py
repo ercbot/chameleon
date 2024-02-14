@@ -1,6 +1,5 @@
 from kani import Kani
 
-
 class LogMessagesKani(Kani):
     def __init__(self, engine, log_filepath: str = None,  *args, **kwargs):
         super().__init__(engine, *args, **kwargs)
@@ -11,6 +10,6 @@ class LogMessagesKani(Kani):
 
         # Logs Message to File
         if self.log_filepath:
-            with open(self.log_filepath, "a") as log_file:
+            with open(self.log_filepath, "a+") as log_file:
                 log_file.write(message.model_dump_json())
                 log_file.write("\n")

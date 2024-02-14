@@ -1,19 +1,26 @@
-import asyncio
+import os
 
 from game_utils import *
 from models import *
 from player import Player
-
 from parser import ParserKani
 
 # Default Values
 NUMBER_OF_PLAYERS = 5
 
 class Game:
+
+    log_dir = os.path.join(os.pardir, "experiments")
+    player_log_file = "{game_id}-{role}-{player_num}.jsonl"
+    parser_log_file = "{game_id}-parser.jsonl"
+
     def __init__(self,
             human_name: str = None,
             number_of_players: int = NUMBER_OF_PLAYERS
         ):
+
+        # Game ID
+        self.game_id = game_id()
 
         # Gather Player Names
         if human_name:
@@ -40,13 +47,16 @@ class Game:
             else:
                 role = "herd"
 
-            self.players.append(Player(name, controller, role))
+            log_path = os.path.join(self.log_dir, self.player_log_file.format(game_id=self.game_id, role=role, player_num=i))
+
+            self.players.append(Player(name, controller, role, log_filepath=log_path))
 
         # Game State
         self.player_responses = []
 
         # Parser
-        self.parser = ParserKani.default()
+        parser_log_path = os.path.join(self.log_dir, self.parser_log_file.format(game_id=self.game_id))
+        self.parser = ParserKani.default(parser_log_path)
 
     def format_responses(self) -> str:
         """Formats the responses of the players into a single string."""
@@ -126,5 +136,6 @@ class Game:
         # Herd Wins by Failed Chameleon Guess - 1 Point (each)
         # Herd Wins by Correctly Guessing Chameleon - 2 points (each)
 
+        # Log Game Info
 
 

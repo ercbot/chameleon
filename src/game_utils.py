@@ -2,6 +2,14 @@
 Utilities for the game including random selections and prompts.
 """
 import random
+import string
+
+ALPHABET = string.ascii_lowercase + string.digits
+ID_LENGTH = 8
+
+
+def game_id():
+    return ''.join(random.choices(ALPHABET, k=ID_LENGTH)) # Using this instead of uuid for shorter game ids
 
 
 def random_animal():

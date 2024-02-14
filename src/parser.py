@@ -66,10 +66,10 @@ class ParserKani(LogMessagesKani):
         return FORMAT_INSTRUCTIONS.format(schema=schema_str)
 
     @classmethod
-    def default(cls):
+    def default(cls, log_filepath: str = None):
         """Default ParserKani with OpenAIEngine."""
         engine = OpenAIEngine(model="gpt-3.5-turbo")
-        return cls(engine)
+        return cls(engine, log_filepath=log_filepath)
 
 
 
