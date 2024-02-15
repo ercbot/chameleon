@@ -3,6 +3,7 @@ Utilities for the game including random selections and prompts.
 """
 import random
 import string
+from collections import Counter
 
 ALPHABET = string.ascii_lowercase + string.digits
 ID_LENGTH = 8
@@ -28,6 +29,18 @@ available_names = ["Jack", "Jill", "Bob", "Courtney", "Fizz", "Mallory"]
 
 def random_index(number_of_players : int) -> int:
     return random.randint(0, number_of_players - 1)
+
+
+def count_chameleon_votes(player_votes: list[str]) -> str | None:
+    """Counts the votes for each player."""
+    freq = Counter(player_votes)
+    most_voted_player, number_of_votes = freq.most_common()[0]
+
+    # If one player has more than 50% of the votes, the herd accuses them of being the chameleon
+    if number_of_votes / len(player_votes) >= 0.5:
+        return most_voted_player
+    else:
+        return None
 
 
 def fetch_prompt(prompt_name):

@@ -66,22 +66,6 @@ class Game:
         """Returns the names of the players."""
         return [player.name for player in self.players]
 
-    @staticmethod
-    def player_action(prompt: str, player, validator: callable = None):
-        """Prompts the player to take an action and validates the response."""
-        max_attempts = 3
-        response = player.respond_to(prompt)
-
-        if validator:
-            attempts = 0
-            while not validator(response):
-                attempts += 1
-                if attempts >= max_attempts:
-                    raise ValueError(f"Player {player.name} did not provide a valid response to the following prompt:\n{prompt} Response: {response}")
-                response = player.respond_to(prompt)
-
-        return response
-
     async def start(self):
         """Starts the game."""
         # print("Welcome to Chameleon! This is a social deduction game powered by LLMs.")
@@ -89,47 +73,63 @@ class Game:
         self.player_responses = []
         herd_animal = random_animal()
 
-        # Collect Player Animal Descriptions
-        for player in self.players:
-            if player.role == "chameleon":
-                prompt_template = fetch_prompt("chameleon_animal")
-                prompt = prompt_template.format(player_responses=self.format_responses())
-            else:
-                prompt_template = fetch_prompt("herd_animal")
-                prompt = prompt_template.format(animal=herd_animal, player_responses=self.format_responses())
+        game_over = False
 
-            # Get Player Animal Description
-            response = await player.respond_to(prompt)
-            # Parse Animal Description
-            output = await self.parser.parse(prompt, response, AnimalDescriptionModel)
-
-            self.player_responses.append({"sender": player.name, "response": output.description})
-
-        # Show All Player Responses
-
-        # Chameleon Decides if they want to guess the animal
-        chameleon_will_guess = False
-
-        if chameleon_will_guess:
-            # Chameleon Guesses Animal
-            # TODO: Add Chameleon Guessing Logic
-            pass
-        else:
-            # All Players Vote for Chameleon
-            player_votes = []
+        while not game_over:
+            # Phase I: Collect Player Animal Descriptions
             for player in self.players:
-                prompt_template = fetch_prompt("vote")
-                prompt = prompt_template.format(player_responses=self.format_responses())
+                if player.role == "chameleon":
+                    prompt_template = fetch_prompt("chameleon_animal")
+                    prompt = prompt_template.format(player_responses=self.format_responses())
+                else:
+                    prompt_template = fetch_prompt("herd_animal")
+                    prompt = prompt_template.format(animal=herd_animal, player_responses=self.format_responses())
 
-                # Get Player Vote
+                # Get Player Animal Description
                 response = await player.respond_to(prompt)
-                # Parse Vote
-                output = await self.parser.parse(prompt, response, VoteModel)
+                # Parse Animal Description
+                output = await self.parser.parse(prompt, response, AnimalDescriptionModel)
 
-                # Add Vote to Player Votes
-                player_votes.append(output.vote)
+                self.player_responses.append({"sender": player.name, "response": output.description})
 
-            print(player_votes)
+            # Phase II: Chameleon Decides if they want to guess the animal (secretly)
+            chameleon_will_guess = False
+
+            # Phase III: Chameleon Guesses Animal or All Players Vote for Chameleon
+            if chameleon_will_guess:
+                # Chameleon Guesses Animal
+                # TODO: Add Chameleon Guessing Logic
+                pass
+            else:
+                # All Players Vote for Chameleon
+                player_votes = []
+                for player in self.players:
+                    prompt_template = fetch_prompt("vote")
+                    prompt = prompt_template.format(player_responses=self.format_responses())
+
+                    # Get Player Vote
+                    response = await player.respond_to(prompt)
+                    # Parse Vote
+                    output = await self.parser.parse(prompt, response, VoteModel)
+
+                    # check if a valid player was voted for...
+
+                    # Add Vote to Player Votes
+                    player_votes.append(output.vote)
+
+                print(player_votes)
+
+                # Count Votes
+                accused_player = count_chameleon_votes(player_votes)
+
+                if accused_player:
+                    game_over = True
+                    if accused_player == self.players[self.chameleon_index].name:
+                        winner = "herd"
+                    else:
+                        winner = "chameleon"
+
+        print(f"Game Over! The {winner} wins!")
 
         # Assign Points
         # Chameleon Wins - 3 Points
