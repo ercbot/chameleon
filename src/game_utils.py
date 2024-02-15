@@ -20,7 +20,10 @@ def random_animal():
 available_animals = ["Giraffe", "Elephant", "Lion", "Zebra", "Monkey", "Gorilla"]
 
 
-def random_names(number_of_samples : int) -> list[str]:
+def random_names(number_of_samples: int, human_name: str = None) -> list[str]:
+    """Returns a list of random names, excluding the one of the human player (if provided)"""
+    if human_name and human_name in available_names:
+        available_names.remove(human_name)
     return random.sample(available_names, number_of_samples)
 
 

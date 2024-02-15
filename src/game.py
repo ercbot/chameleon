@@ -24,7 +24,7 @@ class Game:
 
         # Gather Player Names
         if human_name:
-            ai_names = random_names(number_of_players - 1)
+            ai_names = random_names(number_of_players - 1, human_name)
             self.human_index = random_index(number_of_players)
         else:
             ai_names = random_names(number_of_players)
