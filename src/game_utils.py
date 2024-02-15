@@ -73,6 +73,16 @@ Previously Mentioned Descriptions:
 {player_responses}
 """
 
+_chameleon_guess_decision = """\
+You now have the opportunity to guess what animal the other players are pretending to be.
+If you guess correctly you will WIN, if you guess incorrectly you will LOSE.
+If you believe you know what animal the other players are pretending to be make choose to GUESS, otherwise choose to PASS.
+"""
+
+_chameleon_guess_animal = """\
+What animal do you think the other players are pretending to be?
+"""
+
 _vote_prompt = """\
 Below are the responses from all players. Now it is time to vote. Choose from the players below who you think the Chameleon is.
 {player_responses}
@@ -81,6 +91,8 @@ Below are the responses from all players. Now it is time to vote. Choose from th
 prompts = {
     "herd_animal": _game_rules + _herd_animal,
     "chameleon_animal": _game_rules + _chameleon_animal,
+    "chameleon_guess_decision": _chameleon_guess_decision,
+    "chameleon_guess_animal": _chameleon_guess_animal,
     "vote": _vote_prompt
 }
 

@@ -8,16 +8,16 @@ from parser import ParserKani
 # Default Values
 NUMBER_OF_PLAYERS = 5
 
-class Game:
 
+class Game:
     log_dir = os.path.join(os.pardir, "experiments")
     player_log_file = "{game_id}-{role}-{player_num}.jsonl"
     parser_log_file = "{game_id}-parser.jsonl"
 
     def __init__(self,
-            human_name: str = None,
-            number_of_players: int = NUMBER_OF_PLAYERS
-        ):
+                 human_name: str = None,
+                 number_of_players: int = NUMBER_OF_PLAYERS
+                 ):
 
         # Game ID
         self.game_id = game_id()
@@ -47,7 +47,8 @@ class Game:
             else:
                 role = "herd"
 
-            log_path = os.path.join(self.log_dir, self.player_log_file.format(game_id=self.game_id, role=role, player_num=i))
+            log_path = os.path.join(self.log_dir,
+                                    self.player_log_file.format(game_id=self.game_id, role=role, player_num=i))
 
             self.players.append(Player(name, controller, role, log_filepath=log_path))
 
@@ -93,13 +94,31 @@ class Game:
                 self.player_responses.append({"sender": player.name, "response": output.description})
 
             # Phase II: Chameleon Decides if they want to guess the animal (secretly)
-            chameleon_will_guess = False
+            prompt = fetch_prompt("chameleon_guess_decision")
+
+            response = await self.players[self.chameleon_index].respond_to(prompt)
+            output = await self.parser.parse(prompt, response, ChameleonGuessDecisionModel)
+
+            if output.decision == "guess":
+                chameleon_will_guess = True
+            else:
+                chameleon_will_guess = False
 
             # Phase III: Chameleon Guesses Animal or All Players Vote for Chameleon
             if chameleon_will_guess:
                 # Chameleon Guesses Animal
-                # TODO: Add Chameleon Guessing Logic
-                pass
+                prompt = fetch_prompt("chameleon_guess_animal")
+
+                response = await self.players[self.chameleon_index].respond_to(prompt)
+                output = await self.parser.parse(prompt, response, ChameleonGuessAnimalModel)
+
+                if output.animal == herd_animal:
+                    game_over = True
+                    winner = "chameleon"
+                else:
+                    game_over = True
+                    winner = "herd"
+
             else:
                 # All Players Vote for Chameleon
                 player_votes = []
@@ -137,5 +156,3 @@ class Game:
         # Herd Wins by Correctly Guessing Chameleon - 2 points (each)
 
         # Log Game Info
-
-

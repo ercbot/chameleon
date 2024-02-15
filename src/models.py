@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from pydantic import BaseModel, field_validator
 
 MAX_DESCRIPTION_LEN = 10
@@ -29,6 +31,21 @@ class ChameleonDecisionModel(BaseModel):
 
 class AnimalGuessModel(BaseModel):
     animal_name: str
+
+
+class ChameleonGuessDecisionModel(BaseModel):
+    decision: Annotated[str, "Must be one of: ['guess', 'pass']"]
+
+    @field_validator('decision')
+    @classmethod
+    def check_decision(cls, v) -> str:
+        if v.lower() not in ['guess', 'pass']:
+            raise ValueError("Decision must be one of: ['guess', 'pass']")
+        return v
+
+
+class ChameleonGuessAnimalModel(BaseModel):
+    animal: str
 
 
 class VoteModel(BaseModel):
