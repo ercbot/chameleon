@@ -11,13 +11,15 @@ NUMBER_OF_PLAYERS = 5
 
 class Game:
     log_dir = os.path.join(os.pardir, "experiments")
-    player_log_file = "{game_id}-{role}-{player_num}.jsonl"
+    player_log_file = "{player_id}.jsonl"
     parser_log_file = "{game_id}-parser.jsonl"
+    game_log_file = "{game_id}-game.jsonl"
 
-    def __init__(self,
-                 human_name: str = None,
-                 number_of_players: int = NUMBER_OF_PLAYERS
-                 ):
+    def __init__(
+            self,
+            human_name: str = None,
+            number_of_players: int = NUMBER_OF_PLAYERS
+    ):
 
         # Game ID
         self.game_id = game_id()
@@ -28,6 +30,7 @@ class Game:
             self.human_index = random_index(number_of_players)
         else:
             ai_names = random_names(number_of_players)
+            self.human_index = None
 
         # Choose Chameleon
         self.chameleon_index = random_index(number_of_players)
@@ -47,10 +50,14 @@ class Game:
             else:
                 role = "herd"
 
-            log_path = os.path.join(self.log_dir,
-                                    self.player_log_file.format(game_id=self.game_id, role=role, player_num=i))
+            player_id = f"{self.game_id}-{i + 1}-{role}"
 
-            self.players.append(Player(name, controller, role, log_filepath=log_path))
+            log_path = os.path.join(
+                self.log_dir,
+                self.player_log_file.format(player_id=player_id)
+            )
+
+            self.players.append(Player(name, controller, role, player_id, log_filepath=log_path))
 
         # Game State
         self.player_responses = []
@@ -74,9 +81,9 @@ class Game:
         self.player_responses = []
         herd_animal = random_animal()
 
-        game_over = False
+        winner = None
 
-        while not game_over:
+        while not winner:
             # Phase I: Collect Player Animal Descriptions
             for player in self.players:
                 if player.role == "chameleon":
@@ -113,10 +120,8 @@ class Game:
                 output = await self.parser.parse(prompt, response, ChameleonGuessAnimalModel)
 
                 if output.animal == herd_animal:
-                    game_over = True
                     winner = "chameleon"
                 else:
-                    game_over = True
                     winner = "herd"
 
             else:
@@ -142,7 +147,6 @@ class Game:
                 accused_player = count_chameleon_votes(player_votes)
 
                 if accused_player:
-                    game_over = True
                     if accused_player == self.players[self.chameleon_index].name:
                         winner = "herd"
                     else:
@@ -156,3 +160,14 @@ class Game:
         # Herd Wins by Correctly Guessing Chameleon - 2 points (each)
 
         # Log Game Info
+        game_log = {
+            "game_id": self.game_id,
+            "herd_animal": herd_animal,
+            "number_of_players": len(self.players),
+            "human_player": self.players[self.human_index].id if self.human_index else "None",
+            "chameleon": self.players[self.chameleon_index].id,
+            "winner": winner
+        }
+        game_log_path = os.path.join(self.log_dir, self.game_log_file.format(game_id=self.game_id))
+
+        log(game_log, game_log_path)

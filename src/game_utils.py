@@ -3,6 +3,7 @@ Utilities for the game including random selections and prompts.
 """
 import random
 import string
+import json
 from collections import Counter
 
 ALPHABET = string.ascii_lowercase + string.digits
@@ -46,6 +47,12 @@ def count_chameleon_votes(player_votes: list[str]) -> str | None:
         return None
 
 
+def log(log_object, log_file):
+    with open(log_file, "a+") as f:
+        f.write(json.dumps(log_object) + "\n")
+
+
+# Prompt Stuff
 def fetch_prompt(prompt_name):
     return prompts[prompt_name]
 

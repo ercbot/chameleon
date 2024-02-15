@@ -1,10 +1,12 @@
 import os
+import json
 import asyncio
 
 import openai
 from agents import LogMessagesKani
 from kani.engines.openai import OpenAIEngine
 
+from game_utils import log
 
 # Using TGI Inference Endpoints from Hugging Face
 # api_type = "tgi"
@@ -24,14 +26,24 @@ openai_engine = OpenAIEngine(model="gpt-3.5-turbo")
 
 
 class Player:
-    def __init__(self, name: str, controller_type: str, role: str, log_filepath: str = None):
+    def __init__(self, name: str, controller_type: str, role: str, id: str = None, log_filepath: str = None):
         self.name = name
+        self.id = id
         self.controller = controller_type
         if controller_type == "ai":
             self.kani = LogMessagesKani(openai_engine, log_filepath=log_filepath)
 
         self.role = role
         self.messages = []
+
+        if log_filepath:
+            player_info = {
+                "id": self.id,
+                "name": self.name,
+                "role": self.role,
+                "controller": controller_type,
+            }
+            log(player_info, log_filepath)
 
     async def respond_to(self, prompt: str) -> str:
         """Makes the player respond to a prompt. Returns the response."""

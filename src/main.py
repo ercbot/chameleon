@@ -8,6 +8,8 @@ def main():
 
     game = Game(human_name=name)
 
+    # game = Game()
+
     asyncio.run(game.start())
 
 
