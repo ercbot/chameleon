@@ -4,6 +4,7 @@ import asyncio
 
 import openai
 from agents import LogMessagesKani
+from kani import ChatMessage
 from kani.engines.openai import OpenAIEngine
 
 from game_utils import log
@@ -36,6 +37,8 @@ class Player:
         self.role = role
         self.messages = []
 
+        self.log_filepath = log_filepath
+
         if log_filepath:
             player_info = {
                 "id": self.id,
@@ -47,20 +50,20 @@ class Player:
 
     async def respond_to(self, prompt: str) -> str:
         """Makes the player respond to a prompt. Returns the response."""
-        # Generate a response from the controller
-        output = await self.__generate(prompt)
-
-        return output
-
-    async def __generate(self, prompt: str) -> str:
         if self.controller == "human":
+            # We're pretending the human is an ai for logging purposes... I don't love this but it's fine for now
+            log(ChatMessage.user(prompt), self.log_filepath)
             print(prompt)
-            return input()
+            output = input()
+            log(ChatMessage.ai(output), self.log_filepath)
+
+            return output
 
         elif self.controller == "ai":
             output = await self.kani.chat_round_str(prompt)
 
             return output
+
 
 
 
