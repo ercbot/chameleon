@@ -10,8 +10,8 @@ from kani.engines.openai import OpenAIEngine
 from game_utils import log
 
 # api_type = "tgi"
-# api_type = "openai"
-api_type = "ollama"
+api_type = "openai"
+# api_type = "ollama"
 
 match api_type:
     case "tgi":
