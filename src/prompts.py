@@ -1,7 +1,10 @@
-
-
 def fetch_prompt(prompt_name):
+    """Fetches a static prompt."""
     return prompts[prompt_name]
+
+def format_prompt(prompt_name, **kwargs):
+    """Fetches a template prompt and populates it."""
+    return fetch_prompt(prompt_name).format(**kwargs)
 
 
 _game_rules = '''\
@@ -30,6 +33,11 @@ Previously Mentioned Descriptions:
 {player_responses}
 """
 
+_all_responses = """\
+Below are the responses from all the other players. 
+{player_responses}
+"""
+
 _chameleon_guess_decision = """\
 You now have the opportunity to guess what animal the other players are pretending to be.
 If you guess correctly you will WIN, if you guess incorrectly you will LOSE.
@@ -41,15 +49,14 @@ What animal do you think the other players are pretending to be?
 """
 
 _vote_prompt = """\
-Below are the responses from all players. Now it is time to vote. Choose from the players below who you think the Chameleon is.
-{player_responses}
+Now it is time to vote. Choose from the players above who you think the Chameleon is.
 """
 
 prompts = {
     "herd_animal": _game_rules + _herd_animal,
     "chameleon_animal": _game_rules + _chameleon_animal,
-    "chameleon_guess_decision": _chameleon_guess_decision,
+    "chameleon_guess_decision": _all_responses + _chameleon_guess_decision,
     "chameleon_guess_animal": _chameleon_guess_animal,
-    "vote": _vote_prompt
+    "vote": _all_responses + _vote_prompt
 }
 

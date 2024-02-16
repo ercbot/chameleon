@@ -4,7 +4,7 @@ from game_utils import *
 from models import *
 from player import Player
 from parser import ParserKani
-from prompts import fetch_prompt
+from prompts import fetch_prompt, format_prompt
 
 # Default Values
 NUMBER_OF_PLAYERS = 5
@@ -88,11 +88,9 @@ class Game:
             # Phase I: Collect Player Animal Descriptions
             for player in self.players:
                 if player.role == "chameleon":
-                    prompt_template = fetch_prompt("chameleon_animal")
-                    prompt = prompt_template.format(player_responses=self.format_responses())
+                    prompt = format_prompt("chameleon_animal", player_responses=self.format_responses())
                 else:
-                    prompt_template = fetch_prompt("herd_animal")
-                    prompt = prompt_template.format(animal=herd_animal, player_responses=self.format_responses())
+                    prompt = format_prompt("herd_animal", animal=herd_animal, player_responses=self.format_responses())
 
                 # Get Player Animal Description
                 response = await player.respond_to(prompt)
@@ -102,7 +100,7 @@ class Game:
                 self.player_responses.append({"sender": player.name, "response": output.description})
 
             # Phase II: Chameleon Decides if they want to guess the animal (secretly)
-            prompt = fetch_prompt("chameleon_guess_decision")
+            prompt = format_prompt("chameleon_guess_decision", player_responses=self.format_responses())
 
             response = await self.players[self.chameleon_index].respond_to(prompt)
             output = await self.parser.parse(prompt, response, ChameleonGuessDecisionModel)
@@ -129,8 +127,7 @@ class Game:
                 # All Players Vote for Chameleon
                 player_votes = []
                 for player in self.players:
-                    prompt_template = fetch_prompt("vote")
-                    prompt = prompt_template.format(player_responses=self.format_responses())
+                    prompt = format_prompt("vote", player_responses=self.format_responses())
 
                     # Get Player Vote
                     response = await player.respond_to(prompt)
