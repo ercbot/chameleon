@@ -9,21 +9,27 @@ from kani.engines.openai import OpenAIEngine
 
 from game_utils import log
 
-# Using TGI Inference Endpoints from Hugging Face
 # api_type = "tgi"
-api_type = "openai"
+# api_type = "openai"
+api_type = "ollama"
 
-if api_type == "tgi":
-    model_name = "tgi"
-    client = openai.Client(
-        base_url=os.environ['HF_ENDPOINT_URL'] + "/v1/",
-        api_key=os.environ['HF_API_TOKEN']
-    )
-else:
-    model_name = "gpt-3.5-turbo"
-    client = openai.Client()
-
-openai_engine = OpenAIEngine(model="gpt-3.5-turbo")
+match api_type:
+    case "tgi":
+        # Using TGI Inference Endpoints from Hugging Face
+        default_engine = OpenAIEngine(  # type: ignore
+            api_base=os.environ['HF_ENDPOINT_URL'] + "/v1/",
+            api_key=os.environ['HF_API_TOKEN']
+        )
+    case "openai":
+        # Using OpenAI GPT-3.5 Turbo
+        default_engine = OpenAIEngine(model="gpt-3.5-turbo")  # type: ignore
+    case "ollama":
+        # Using Ollama
+        default_engine = OpenAIEngine(
+            api_base="http://localhost:11434/v1",
+            api_key="ollama",
+            model="mistral"
+        )
 
 
 class Player:
@@ -32,7 +38,7 @@ class Player:
         self.id = id
         self.controller = controller_type
         if controller_type == "ai":
-            self.kani = LogMessagesKani(openai_engine, log_filepath=log_filepath)
+            self.kani = LogMessagesKani(default_engine, log_filepath=log_filepath)
 
         self.role = role
         self.messages = []
@@ -52,10 +58,10 @@ class Player:
         """Makes the player respond to a prompt. Returns the response."""
         if self.controller == "human":
             # We're pretending the human is an ai for logging purposes... I don't love this but it's fine for now
-            log(ChatMessage.user(prompt), self.log_filepath)
+            log(ChatMessage.user(prompt).model_dump_json(), self.log_filepath)
             print(prompt)
             output = input()
-            log(ChatMessage.ai(output), self.log_filepath)
+            log(ChatMessage.assistant(output).model_dump_json(), self.log_filepath)
 
             return output
 
