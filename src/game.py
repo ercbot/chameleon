@@ -4,6 +4,7 @@ from game_utils import *
 from models import *
 from player import Player
 from parser import ParserKani
+from prompts import fetch_prompt
 
 # Default Values
 NUMBER_OF_PLAYERS = 5
