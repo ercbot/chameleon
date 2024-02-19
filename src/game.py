@@ -109,7 +109,7 @@ class Game:
 
             response = await self.players[self.chameleon_index].respond_to(prompt, ChameleonGuessDecisionModel)
 
-            if response.decision == "guess":
+            if response.decision.lower() == "guess":
                 chameleon_will_guess = True
             else:
                 chameleon_will_guess = False
@@ -121,7 +121,7 @@ class Game:
 
                 response = await self.players[self.chameleon_index].respond_to(prompt, ChameleonGuessAnimalModel)
 
-                if response.animal == herd_animal:
+                if response.animal.lower() == herd_animal.lower():
                     winner = "chameleon"
                 else:
                     winner = "herd"
