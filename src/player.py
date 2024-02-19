@@ -5,7 +5,7 @@ from langchain_core.runnables import Runnable, RunnableParallel, RunnableLambda,
 
 from langchain.output_parsers import PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AnyMessage
 
 from pydantic import BaseModel
 
@@ -74,9 +74,9 @@ class Player:
 
         return output
 
-    def add_to_history(self, message):
+    def add_to_history(self, message: AnyMessage):
         self.messages.append(message)
-        # log(message.model_dump_json(), self.log_filepath)
+        log(message.dict(), self.log_filepath)
 
     def _generate(self, message: HumanMessage):
         """Entry point for the Runnable generating responses, automatically logs the message."""
