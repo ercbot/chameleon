@@ -1,44 +1,35 @@
 import os
-import json
-import asyncio
+from typing import Type
 
-import openai
-from agents import LogMessagesKani
-from kani import ChatMessage
-from kani.engines.openai import OpenAIEngine
+from langchain_core.runnables import Runnable, RunnableParallel, RunnableLambda, chain
+
+from langchain.output_parsers import PydanticOutputParser
+from langchain_core.prompts import PromptTemplate
+from langchain_core.messages import HumanMessage
+
+from pydantic import BaseModel
 
 from game_utils import log
-
-# api_type = "tgi"
-api_type = "openai"
-# api_type = "ollama"
-
-match api_type:
-    case "tgi":
-        # Using TGI Inference Endpoints from Hugging Face
-        default_engine = OpenAIEngine(  # type: ignore
-            api_base=os.environ['HF_ENDPOINT_URL'] + "/v1/",
-            api_key=os.environ['HF_API_TOKEN']
-        )
-    case "openai":
-        # Using OpenAI GPT-3.5 Turbo
-        default_engine = OpenAIEngine(model="gpt-3.5-turbo")  # type: ignore
-    case "ollama":
-        # Using Ollama
-        default_engine = OpenAIEngine(
-            api_base="http://localhost:11434/v1",
-            api_key="ollama",
-            model="mistral"
-        )
-
+from controllers import controller_from_name
 
 class Player:
-    def __init__(self, name: str, controller_type: str, role: str, id: str = None, log_filepath: str = None):
+    def __init__(
+            self,
+            name: str,
+            controller: str,
+            role: str,
+            id: str = None,
+            log_filepath: str = None
+    ):
         self.name = name
         self.id = id
-        self.controller = controller_type
-        if controller_type == "ai":
-            self.kani = LogMessagesKani(default_engine, log_filepath=log_filepath)
+
+        if controller == "human":
+            self.controller_type = "human"
+        else:
+            self.controller_type = "ai"
+
+        self.controller = controller_from_name(controller)
 
         self.role = role
         self.messages = []
@@ -50,26 +41,71 @@ class Player:
                 "id": self.id,
                 "name": self.name,
                 "role": self.role,
-                "controller": controller_type,
+                "controller": {
+                    "name": controller,
+                    "type": self.controller_type
+                }
             }
             log(player_info, log_filepath)
 
-    async def respond_to(self, prompt: str) -> str:
-        """Makes the player respond to a prompt. Returns the response."""
-        if self.controller == "human":
-            # We're pretending the human is an ai for logging purposes... I don't love this but it's fine for now
-            log(ChatMessage.user(prompt).model_dump_json(), self.log_filepath)
-            print(prompt)
-            output = input()
-            log(ChatMessage.assistant(output).model_dump_json(), self.log_filepath)
+        # initialize the runnables
+        self.generate = RunnableLambda(self._generate)
+        self.format_output = RunnableLambda(self._output_formatter)
 
-            return output
+    async def respond_to(self, prompt: str, output_format: Type[BaseModel], max_retries=3):
+        """Makes the player respond to a prompt. Returns the response in the specified format."""
+        message = HumanMessage(content=prompt)
+        output = await self.generate.ainvoke(message)
+        if self.controller_type == "ai":
+            retries = 0
+            try:
+                output = await self.format_output.ainvoke({"output_format": output_format})
+            except ValueError as e:
+                if retries < max_retries:
+                    self.add_to_history(HumanMessage(content=f"Error formatting response: {e} \n\n Please try again."))
+                    output = await self.format_output.ainvoke({"output_format": output_format})
+                    retries += 1
+                else:
+                    raise e
+        else:
+            # Convert the human message to the pydantic object format
+            field_name = output_format.model_fields.copy().popitem()[0]  # only works because current outputs have only 1 field
+            output = output_format.model_validate({field_name: output.content})
 
-        elif self.controller == "ai":
-            output = await self.kani.chat_round_str(prompt)
+        return output
 
-            return output
+    def add_to_history(self, message):
+        self.messages.append(message)
+        # log(message.model_dump_json(), self.log_filepath)
 
+    def _generate(self, message: HumanMessage):
+        """Entry point for the Runnable generating responses, automatically logs the message."""
+        self.add_to_history(message)
 
+        # AI's need to be fed the whole message history, but humans can just go back and look at it
+        if self.controller_type == "human":
+            response = self.controller.invoke(message.content)
+        else:
+            response = self.controller.invoke(self.messages)
 
+        self.add_to_history(response)
 
+        return response
+
+    def _output_formatter(self, inputs: dict):
+        """Formats the output of the response."""
+        output_format: BaseModel = inputs["output_format"]
+
+        prompt_template = PromptTemplate.from_template(
+            "Please rewrite your previous response using the following format: \n\n{format_instructions}"
+        )
+
+        parser = PydanticOutputParser(pydantic_object=output_format)
+
+        prompt = prompt_template.invoke({"format_instructions": parser.get_format_instructions()})
+
+        message = HumanMessage(content=prompt.text)
+
+        response = self.generate.invoke(message)
+
+        return parser.invoke(response)

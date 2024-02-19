@@ -1,4 +1,6 @@
-from typing import Annotated
+import random
+from typing import Annotated, Type, List
+import json
 
 from pydantic import BaseModel, field_validator
 
@@ -7,7 +9,7 @@ MAX_DESCRIPTION_LEN = 10
 
 class AnimalDescriptionModel(BaseModel):
     # Define fields of our class here
-    description: str
+    description: Annotated[str, "A brief description of the animal"]
 
     # @field_validator('description')
     # @classmethod
@@ -45,11 +47,18 @@ class ChameleonGuessDecisionModel(BaseModel):
 
 
 class ChameleonGuessAnimalModel(BaseModel):
-    animal: str
+    animal: Annotated[str, "The name of the animal the chameleon is guessing"]
+
+    @field_validator('animal')
+    @classmethod
+    def is_one_word(cls, v) -> str:
+        if len(v.split()) > 1:
+            raise ValueError("Animal's name must be one word")
+        return v
 
 
 class VoteModel(BaseModel):
-    vote: str
+    vote: Annotated[str, "The name of the player you are voting for"]
 
     # @field_validator('vote')
     # @classmethod
