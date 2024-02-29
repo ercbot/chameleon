@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+from typing import Optional, Type
 
 from colorama import Fore, Style
 
@@ -11,7 +12,6 @@ from prompts import fetch_prompt, format_prompt
 # Default Values
 NUMBER_OF_PLAYERS = 5
 
-game_type = "streamlit"
 
 class Game:
     log_dir = os.path.join(os.pardir, "experiments")
@@ -88,18 +88,28 @@ class Game:
             return formatted_responses
 
 
-    def game_message(self, message: str, excluded_player: Player = None):
-        """Sends a message to all players. No response is expected."""
-        for player in self.players:
-            if player != excluded_player:
-                player.prompt_queue.append(message)
-                if player.controller_type == "human":
-                    print(message)
+    def game_message(
+            self, message: str,
+            recipient: Optional[Player] = None,  # If None, message is broadcast to all players
+            exclude: bool = False  # If True, the message is broadcast to all players except the chosen player
+    ):
+        """Sends a message to a player. No response is expected, however it will be included next time the player is prompted"""
+        if exclude or not recipient:
+            for player in self.players:
+                if player != recipient:
+                    player.prompt_queue.append(message)
+                    if player.controller_type == "human":
+                        print(message)
+        else:
+            recipient.prompt_queue.append(message)
+            if recipient.controller_type == "human":
+                print(message)
 
     @staticmethod
     async def instructional_message(message: str, player: Player,  output_format: Type[BaseModel]):
         """Sends a message to a specific player and gets their response."""
-
+        if player.controller_type == "human":
+            print(message)
         response = await player.respond_to(message, output_format)
         return response
 
@@ -109,10 +119,10 @@ class Game:
         if self.verbose:
             print(Fore.GREEN + message + Style.RESET_ALL)
 
-    def debug_message(self, message: str):
-        """Sends a message for a human observer. These messages contain secret information about the players such as their role."""
-        if self.debug:
-            print(Fore.YELLOW + message + Style.RESET_ALL)
+    # def debug_message(self, message: str):
+    #     """Sends a message for a human observer. These messages contain secret information about the players such as their role."""
+    #     if self.debug:
+    #         print(Fore.YELLOW + message + Style.RESET_ALL)
 
     # def game_setup(self):
     #     """Sets up the game. This includes assigning roles and gathering player names."""
@@ -131,99 +141,95 @@ class Game:
         self.player_responses = []
         herd_animal = random_animal()
 
-        winner = None
+        # Phase I: Collect Player Animal Descriptions
+        self.game_message(f"Each player will now take turns describing themselves.")
+        for current_player in self.players:
+            if current_player.controller_type != "human":
+                self.verbose_message(f"{current_player.name} is thinking...")
 
-        while not winner:
-            # Phase I: Collect Player Animal Descriptions
-            self.game_message(f"Each player will now take turns describing themselves.")
-            for current_player in self.players:
-                if current_player.controller_type != "human":
-                    self.verbose_message(f"It's {current_player.name}'s turn to describe the animal.")
-                    self.verbose_message(f"{current_player.name} is thinking...")
-
-                if current_player.role == "chameleon":
-                    prompt = format_prompt("chameleon_animal", player_responses=self.format_responses())
-                else:
-                    prompt = format_prompt("herd_animal", animal=herd_animal, player_responses=self.format_responses())
-
-                # Get Player Animal Description
-                response = await self.instructional_message(prompt, current_player, AnimalDescriptionModel)
-
-                self.player_responses.append({"sender": current_player.name, "response": response.description})
-
-                self.game_message(f"{current_player.name}: {response.description}", current_player)
-
-
-            # Phase II: Chameleon Decides if they want to guess the animal (secretly)
-            self.game_message("All players have spoken. Now the chameleon will decide if they want to guess the animal or not.")
-            if self.human_index != self.chameleon_index:
-                self.verbose_message("The chameleon is thinking...")
-
-            chameleon = self.players[self.chameleon_index]
-            prompt = format_prompt("chameleon_guess_decision", player_responses=self.format_responses(exclude=chameleon.name))
-            response = await chameleon.respond_to(prompt, ChameleonGuessDecisionModel)
-
-            if response.decision.lower() == "guess":
-                chameleon_will_guess = True
+            if current_player.role == "chameleon":
+                prompt = format_prompt("chameleon_animal", player_responses=self.format_responses())
             else:
-                chameleon_will_guess = False
+                prompt = format_prompt("herd_animal", animal=herd_animal, player_responses=self.format_responses())
 
-            # Phase III: Chameleon Guesses Animal or All Players Vote for Chameleon
-            if chameleon_will_guess:
-                # Chameleon Guesses Animal
-                self.game_message(f"{chameleon.name} has revealed themselves to be the chameleon and is guessing the animal...", chameleon)
+            # Get Player Animal Description
+            response = await self.instructional_message(prompt, current_player, AnimalDescriptionModel)
 
-                prompt = fetch_prompt("chameleon_guess_animal")
+            self.player_responses.append({"sender": current_player.name, "response": response.description})
 
-                response = await self.players[self.chameleon_index].respond_to(prompt, ChameleonGuessAnimalModel)
+            self.game_message(f"{current_player.name}: {response.description}", current_player, exclude=True)
 
-                self.game_message(f"The chameleon guesses: {response.animal}")
 
-                if response.animal.lower() == herd_animal.lower():
-                    self.game_message(f"The Chameleon has guessed the correct animal! The Chameleon wins!")
-                    winner = "chameleon"
-                else:
-                    self.game_message(f"The Chameleon is incorrect, the true animal is a {herd_animal}. The Herd wins!")
+        # Phase II: Chameleon Decides if they want to guess the animal (secretly)
+        self.game_message("All players have spoken. Now the chameleon will decide if they want to guess the animal or not.")
+        if self.human_index != self.chameleon_index:
+            self.verbose_message("The chameleon is thinking...")
+
+        chameleon = self.players[self.chameleon_index]
+        prompt = format_prompt("chameleon_guess_decision", player_responses=self.format_responses(exclude=chameleon.name))
+        response = await self.instructional_message(prompt, chameleon, ChameleonGuessDecisionModel)
+
+        if response.decision.lower() == "guess":
+            chameleon_will_guess = True
+        else:
+            chameleon_will_guess = False
+
+        # Phase III: Chameleon Guesses Animal or All Players Vote for Chameleon
+        if chameleon_will_guess:
+            # Chameleon Guesses Animal
+            self.game_message(f"{chameleon.name} has revealed themselves to be the chameleon and is guessing the animal...", chameleon, exclude=True)
+
+            prompt = fetch_prompt("chameleon_guess_animal")
+
+            response = await self.instructional_message(prompt, chameleon, ChameleonGuessAnimalModel)
+
+            self.game_message(f"The Chameleon guesses you are pretending to be a {response.animal}", chameleon, exclude=True)
+
+            if response.animal.lower() == herd_animal.lower():
+                self.game_message(f"The Chameleon has guessed the correct animal! The Chameleon wins!")
+                winner = "chameleon"
+            else:
+                self.game_message(f"The Chameleon is incorrect, the true animal is a {herd_animal}. The Herd wins!")
+                winner = "herd"
+
+        else:
+            # All Players Vote for Chameleon
+            print("vote time")
+            self.game_message("The chameleon has decided not to guess the animal. Now all players will vote on who they think the chameleon is.")
+
+            player_votes = []
+            for player in self.players:
+                if player.controller_type != "human":
+                    self.verbose_message(f"{player.name} is thinking...")
+
+                prompt = format_prompt("vote", player_responses=self.format_responses(exclude=player.name))
+
+                # Get Player Vote
+                response = await self.instructional_message(prompt, player, VoteModel)
+
+                # check if a valid player was voted for...
+
+                # Add Vote to Player Votes
+                player_votes.append(response.vote)
+
+            self.game_message("All players have voted!")
+            self.game_message(f"Votes: {player_votes}")
+
+            # Count Votes
+            accused_player = count_chameleon_votes(player_votes)
+
+            if accused_player:
+                self.game_message(f"The Herd has accused {accused_player} of being the Chameleon!")
+                if accused_player == self.players[self.chameleon_index].name:
+                    self.game_message(f"{accused_player} is the Chameleon! The Herd wins!")
                     winner = "herd"
-
-
-            else:
-                # All Players Vote for Chameleon
-                self.game_message("The chameleon has decided not to guess the animal. Now all players will vote on who they think the chameleon is.")
-
-                player_votes = []
-                for player in self.players:
-                    if player.controller_type != "human":
-                        self.verbose_message(f"It's {player.name}'s turn to vote.")
-                        self.verbose_message(f"{player.name} is thinking...")
-
-                    prompt = format_prompt("vote", player_responses=self.format_responses(exclude=player.name))
-
-                    # Get Player Vote
-                    response = await player.respond_to(prompt, VoteModel)
-
-                    # check if a valid player was voted for...
-
-                    # Add Vote to Player Votes
-                    player_votes.append(response.vote)
-
-                self.game_message("All players have voted!")
-                self.game_message(f"Votes: {player_votes}")
-
-                # Count Votes
-                accused_player = count_chameleon_votes(player_votes)
-
-                if accused_player:
-                    self.game_message(f"The Herd has accused {accused_player} of being the Chameleon!")
-                    if accused_player == self.players[self.chameleon_index].name:
-                        self.game_message(f"{accused_player} is the Chameleon! The Herd wins!")
-                        winner = "herd"
-                    else:
-                        self.game_message(f"{accused_player} is not the Chameleon! The Chameleon wins!")
-                        self.game_message(f"The real Chameleon was {chameleon.name}.")
-                        winner = "chameleon"
                 else:
-                    self.game_message("The Herd could not come to a consensus. We will play another round!")
+                    self.game_message(f"{accused_player} is not the Chameleon! The Chameleon wins!")
+                    self.game_message(f"The real Chameleon was {chameleon.name}.")
+                    winner = "chameleon"
+            else:
+                self.game_message("The Herd could not come to a consensus. The Chameleon wins!")
+                winner = "chameleon"
 
 
         # Assign Points
