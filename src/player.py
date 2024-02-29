@@ -12,17 +12,18 @@ from pydantic import BaseModel
 from game_utils import log
 from controllers import controller_from_name
 
+
 class Player:
     def __init__(
             self,
             name: str,
             controller: str,
             role: str,
-            id: str = None,
+            player_id: str = None,
             log_filepath: str = None
     ):
         self.name = name
-        self.id = id
+        self.id = player_id
 
         if controller == "human":
             self.controller_type = "human"
@@ -33,6 +34,8 @@ class Player:
 
         self.role = role
         self.messages = []
+
+        self.prompt_queue = []
 
         self.log_filepath = log_filepath
 
@@ -54,6 +57,10 @@ class Player:
 
     async def respond_to(self, prompt: str, output_format: Type[BaseModel], max_retries=3):
         """Makes the player respond to a prompt. Returns the response in the specified format."""
+        if self.prompt_queue:
+            # If there are prompts in the queue, add them to the current prompt
+            prompt = "\n".join(self.prompt_queue + [prompt])
+
         message = HumanMessage(content=prompt)
         output = await self.generate.ainvoke(message)
         if self.controller_type == "ai":

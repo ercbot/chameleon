@@ -1,14 +1,16 @@
 from game import Game
+from player import Player
 import asyncio
 from player import Player
 
 def main():
-    print("Please Enter your name:")
+    print("Please Enter your name, or leave blank to run an AI only game")
     name = input()
 
-    game = Game(human_name=name)
-
-    # game = Game()
+    if name:
+        game = Game(human_name=name)
+    else:
+        game = Game()
 
     asyncio.run(game.start())
 
