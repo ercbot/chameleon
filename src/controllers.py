@@ -10,7 +10,7 @@ def player_input(prompt):
     response = AIMessage(content=input())
     return response
 
-MAX_TOKENS = 20
+MAX_TOKENS = 50
 
 def controller_from_name(name: str):
     if name == "tgi":
