@@ -35,9 +35,11 @@ def random_index(number_of_players : int) -> int:
     return random.randint(0, number_of_players - 1)
 
 
-def count_chameleon_votes(player_votes: list[str]) -> str | None:
+def count_chameleon_votes(player_votes: list[dict]) -> str | None:
     """Counts the votes for each player."""
-    freq = Counter(player_votes)
+    votes = [vote['vote'] for vote in player_votes]
+
+    freq = Counter(votes)
     most_voted_player, number_of_votes = freq.most_common()[0]
 
     # If one player has more than 50% of the votes, the herd accuses them of being the chameleon

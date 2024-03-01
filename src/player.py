@@ -1,5 +1,6 @@
 import os
 from typing import Type, Literal
+import logging
 
 from langchain_core.runnables import Runnable, RunnableParallel, RunnableLambda, chain
 
@@ -16,6 +17,7 @@ from controllers import controller_from_name
 
 Role = Literal["chameleon", "herd"]
 
+logging.basicConfig(level=logging.WARNING)
 
 class Player:
 
@@ -87,13 +89,15 @@ class Player:
             retries = 0
             try:
                 output = await self.format_output.ainvoke({"output_format": output_format})
-            except Exception as e:
-                if retries > max_retries:
+            except OutputParserException as e:
+                if retries < max_retries:
+                    retries += 1
+                    logging.warning(f"Player {self.id} failed to format response: {output} due to an exception: {e} \n\n Retrying {retries}/{max_retries}")
                     self.add_to_history(HumanMessage(content=f"Error formatting response: {e} \n\n Please try again."))
                     output = await self.format_output.ainvoke({"output_format": output_format})
-                    retries += 1
+
                 else:
-                    print(f"Max retries reached due to Error: {e}")
+                    logging.error(f"Max retries reached due to Error: {e}")
                     raise e
         else:
             # Convert the human message to the pydantic object format
