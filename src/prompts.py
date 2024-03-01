@@ -73,18 +73,16 @@ After all players have spoken, they vote on who they think the Chameleon is. \
 _herd_animal = """\
 You are a {animal}, keep this a secret at all costs. 
 In as few words as possible describe of yourself starting with "I". Your description should be vague but true, \
-since if the Chameleon can guess animal you are, you will LOSE. Do not repeat responses from other players.
-Previously Mentioned Descriptions: 
-{player_responses}
-Your Response: """
+since if the Chameleon can guess animal you are, you will LOSE. Do not repeat responses from other players.\
+"""
 
 _chameleon_animal = """\
 You are the Chameleon, keep this a secret at all costs. 
 You don't know what animal the other players are, your goal is to deduce it using the context they provide.
 Starting with "I" describe yourself in 10 words or less as if you are the same animal as the other players. 
 If no one else has said anything try to say something generic that could be true of any animals. 
-If the other players realize you are the Chameleon you will LOSE. 
-Your Response: """
+If the other players realize you are the Chameleon you will LOSE.\
+"""
 
 _all_responses = """\
 Below are the responses from all the other players. 
@@ -113,5 +111,6 @@ prompts = {
     "chameleon_animal": _chameleon_animal,
     "chameleon_guess_decision": _all_responses + _chameleon_guess_decision,
     "chameleon_guess_animal": _chameleon_guess_animal,
+    "response": "Your response:",
     "vote": _all_responses + _vote_prompt
 }

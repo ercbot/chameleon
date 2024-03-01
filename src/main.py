@@ -8,9 +8,9 @@ def main():
     name = input()
 
     if name:
-        game = Game(human_name=name)
+        game = Game(human_name=name, verbose=True)
     else:
-        game = Game()
+        game = Game(verbose=True)
 
     asyncio.run(game.start())
 
