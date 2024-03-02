@@ -131,7 +131,7 @@ class Game:
     # The following methods are used to broadcast messages to a human.
     # They are design so that they can be overridden by a subclass for a different player interface.
     @staticmethod
-    def human_input(prompt: str) -> str:
+    async def human_input(prompt: str) -> AIMessage:
         """Gets input from the human player."""
         response = AIMessage(content=input())
         return response

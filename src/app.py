@@ -18,7 +18,22 @@ def display_message(message):
     elif message["type"] == "debug":
         messages_container.markdown(f":orange[DEBUG: {message['content']}]")
 
+
 class StreamlitGame(Game):
+    @staticmethod
+    async def human_input(prompt: str) -> str:
+        _user_input = st.chat_input("Your message", key=f"user_input_{st.session_state.user_input_id}")
+        st.session_state.user_input_id += 1
+
+        while _user_input is None or _user_input == "":
+            sleep(0.1)
+
+        print(f"User input: {_user_input}")
+
+        response = AIMessage(content=_user_input)
+
+        return response
+
     def human_message(self, message: str):
         message = {"type": "game", "content": message}
         st.session_state["messages"].append(message)
@@ -39,8 +54,10 @@ class StreamlitGame(Game):
 
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
-if "game" not in st.session_state:
-    st.session_state["game"] = StreamlitGame(verbose=True)
+if "game_started" not in st.session_state:
+    st.session_state["game_started"] = False
+if "user_input_id" not in st.session_state:
+    st.session_state["user_input_id"] = 0
 
 margin_size = 1
 center_size = 3
@@ -53,17 +70,24 @@ with title_center:
 left, center, right = st.columns([margin_size, center_size, margin_size])
 
 with center:
-    st.write("Welcome to Chameleon! A deduction and deception game powered by LLMs.")
+    messages_container = st.container()
 
-    start_button = st.button("Start Game")
+    messages_container.write("Welcome to Chameleon! A social deduction game powered by LLMs.")
 
-with right:
-    st.markdown("### Player Scores")
-    for player in st.session_state["game"].players:
-        st.write(f"{player.name}: {player.points}")
+    messages_container.write("Enter your name to begin...")
+
+    if st.session_state.messages:
+        for message in st.session_state.messages:
+            display_message(message)
+
+    user_input = st.chat_input("Your message")
+    st.session_state.user_input_id += 1
+
+if not st.session_state.game_started and user_input:
+    st.session_state.game_started = True
+    if "game" not in st.session_state:
+        st.session_state.game = StreamlitGame(human_name=user_input, verbose=True)
+
+    asyncio.run(st.session_state.game.start())
 
 
-messages_container = center.container()
-
-if start_button:
-    asyncio.run(st.session_state["game"].start())

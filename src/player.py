@@ -138,22 +138,22 @@ class Player:
     def is_ai(self):
         return not self.is_human()
 
-    def _generate(self, message: Message):
+    async def _generate(self, message: Message):
         """Entry point for the Runnable generating responses, automatically logs the message."""
         self.add_to_history(message)
 
         # AI's need to be fed the whole message history, but humans can just go back and look at it
         if self.controller_type == "human":
-            response = self.controller.invoke(message.content)
+            response = await self.controller.ainvoke(message.content)
         else:
             formatted_messages = [(message.langchain_type, message.content) for message in self.messages]
-            response = self.controller.invoke(formatted_messages)
+            response = await self.controller.ainvoke(formatted_messages)
 
         self.add_to_history(Message(type="player", content=response.content))
 
         return response
 
-    def _output_formatter(self, inputs: dict):
+    async def _output_formatter(self, inputs: dict):
         """Formats the output of the response."""
         output_format: BaseModel = inputs["output_format"]
 
@@ -167,6 +167,6 @@ class Player:
 
         message = Message(type="player", content=prompt.text)
 
-        response = self.generate.invoke(message)
+        response = await self.generate.ainvoke(message)
 
-        return parser.invoke(response)
+        return await parser.ainvoke(response)
