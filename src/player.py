@@ -1,12 +1,11 @@
 import os
-from typing import Type, Literal
+from typing import Type, Literal, List
 import logging
 
 from langchain_core.runnables import Runnable, RunnableParallel, RunnableLambda, chain
 
 from langchain.output_parsers import PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
-from langchain_core.messages import HumanMessage, AnyMessage
 
 from langchain_core.exceptions import OutputParserException
 
@@ -18,6 +17,25 @@ from controllers import controller_from_name
 Role = Literal["chameleon", "herd"]
 
 logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger("chameleon")
+
+
+# Lots of AI Libraries use HumanMessage and AIMessage as the base classes for their messages.
+# This doesn't make sense for our as Humans and AIs are both players in the game, meaning they have the same role.
+# The Langchain type field is used to convert to that syntax.
+class Message(BaseModel):
+    type: Literal["prompt", "player"]
+    """The type of the message. Can be "prompt" or "player"."""
+    content: str
+    """The content of the message."""
+    @property
+    def langchain_type(self):
+        """Returns the langchain message type for the message."""
+        if self.type == "prompt":
+            return "human"
+        else:
+            return "ai"
+
 
 class Player:
 
@@ -29,10 +47,6 @@ class Player:
     """The number of times the player has been in the herd."""
     points: int = 0
     """The number of points the player has."""
-    messages: list[AnyMessage] = []
-    """The messages the player has sent and received."""
-    prompt_queue: list[str] = []
-    """A queue of prompts to be added to the next prompt."""
 
     def __init__(
             self,
@@ -50,7 +64,13 @@ class Player:
             self.controller_type = "ai"
 
         self.controller = controller_from_name(controller)
+        """The controller for the player."""
         self.log_filepath = log_filepath
+        """The filepath to the log file. If None, no logs will be written."""
+        self.messages: list[Message] = []
+        """The messages the player has sent and received."""
+        self.prompt_queue: List[str] = []
+        """A queue of prompts to be added to the next prompt."""
 
         if log_filepath:
             player_info = {
@@ -83,7 +103,7 @@ class Player:
             # Clear the prompt queue
             self.prompt_queue = []
 
-        message = HumanMessage(content=prompt)
+        message = Message(type="prompt", content=prompt)
         output = await self.generate.ainvoke(message)
         if self.controller_type == "ai":
             retries = 0
@@ -92,7 +112,7 @@ class Player:
             except OutputParserException as e:
                 if retries < max_retries:
                     retries += 1
-                    logging.warning(f"Player {self.id} failed to format response: {output} due to an exception: {e} \n\n Retrying {retries}/{max_retries}")
+                    logger.warning(f"Player {self.id} failed to format response: {output} due to an exception: {e} \n\n Retrying {retries}/{max_retries}")
                     self.add_to_history(HumanMessage(content=f"Error formatting response: {e} \n\n Please try again."))
                     output = await self.format_output.ainvoke({"output_format": output_format})
 
@@ -106,9 +126,9 @@ class Player:
 
         return output
 
-    def add_to_history(self, message: AnyMessage):
+    def add_to_history(self, message: Message):
         self.messages.append(message)
-        log(message.dict(), self.log_filepath)
+        log(message.model_dump(), self.log_filepath)
 
     def is_human(self):
         return self.controller_type == "human"
@@ -116,7 +136,7 @@ class Player:
     def is_ai(self):
         return not self.is_human()
 
-    def _generate(self, message: HumanMessage):
+    def _generate(self, message: Message):
         """Entry point for the Runnable generating responses, automatically logs the message."""
         self.add_to_history(message)
 
@@ -124,9 +144,10 @@ class Player:
         if self.controller_type == "human":
             response = self.controller.invoke(message.content)
         else:
-            response = self.controller.invoke(self.messages)
+            formatted_messages = [(message.langchain_type, message.content) for message in self.messages]
+            response = self.controller.invoke(formatted_messages)
 
-        self.add_to_history(response)
+        self.add_to_history(Message(type="player", content=response.content))
 
         return response
 
@@ -142,7 +163,7 @@ class Player:
 
         prompt = prompt_template.invoke({"format_instructions": parser.get_format_instructions()})
 
-        message = HumanMessage(content=prompt.text)
+        message = Message(type="player", content=prompt.text)
 
         response = self.generate.invoke(message)
 
