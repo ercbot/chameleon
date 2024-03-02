@@ -101,13 +101,13 @@ class Game:
                 if player != recipient:
                     player.prompt_queue.append(message)
                     if player.controller_type == "human":
-                        print(message)
+                        self.human_message(message)
             if self.verbose:
-                print(message)
+                self.human_message(message)
         else:
             recipient.prompt_queue.append(message)
             if recipient.controller_type == "human":
-                print(message)
+                self.human_message(message)
 
     async def instructional_message(self, message: str, player: Player,  output_format: Type[BaseModel]):
         """Sends a message to a specific player and gets their response."""
@@ -135,7 +135,6 @@ class Game:
 
     async def start(self):
         """Sets up the game. This includes assigning roles and gathering player names."""
-        self.game_message(("Welcome to Chameleon! This is a social deduction game powered by LLMs."))
         self.game_message(fetch_prompt("game_rules"))
 
         await self.run_round()
