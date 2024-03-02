@@ -2,7 +2,7 @@ import os
 from typing import Type, Literal, List
 import logging
 
-from langchain_core.runnables import Runnable, RunnableParallel, RunnableLambda, chain
+from langchain_core.runnables import Runnable, RunnableLambda
 
 from langchain.output_parsers import PydanticOutputParser
 from langchain_core.prompts import PromptTemplate
@@ -24,14 +24,14 @@ logger = logging.getLogger("chameleon")
 # This doesn't make sense for our as Humans and AIs are both players in the game, meaning they have the same role.
 # The Langchain type field is used to convert to that syntax.
 class Message(BaseModel):
-    type: Literal["prompt", "player"]
+    type: Literal["prompt", "player", "retry", "error"]
     """The type of the message. Can be "prompt" or "player"."""
     content: str
     """The content of the message."""
     @property
     def langchain_type(self):
         """Returns the langchain message type for the message."""
-        if self.type == "prompt":
+        if self.type in ["prompt", "retry", "error"]:
             return "human"
         else:
             return "ai"
@@ -51,19 +51,20 @@ class Player:
     def __init__(
             self,
             name: str,
-            controller: str,
+            controller: Type[Runnable | RunnableLambda],
+            controller_name: str,
             player_id: str = None,
             log_filepath: str = None
     ):
         self.name = name
         self.id = player_id
 
-        if controller == "human":
+        if controller_name == "human":
             self.controller_type = "human"
         else:
             self.controller_type = "ai"
 
-        self.controller = controller_from_name(controller)
+        self.controller = controller
         """The controller for the player."""
         self.log_filepath = log_filepath
         """The filepath to the log file. If None, no logs will be written."""
@@ -78,7 +79,7 @@ class Player:
                 "name": self.name,
                 "role": self.role,
                 "controller": {
-                    "name": controller,
+                    "name": controller_name,
                     "type": self.controller_type
                 }
             }
@@ -113,10 +114,11 @@ class Player:
                 if retries < max_retries:
                     retries += 1
                     logger.warning(f"Player {self.id} failed to format response: {output} due to an exception: {e} \n\n Retrying {retries}/{max_retries}")
-                    self.add_to_history(HumanMessage(content=f"Error formatting response: {e} \n\n Please try again."))
+                    self.add_to_history(Message(type="retry", content=f"Error formatting response: {e} \n\n Please try again."))
                     output = await self.format_output.ainvoke({"output_format": output_format})
 
                 else:
+                    self.add_to_history(Message(type="error", content=f"Error formatting response: {e} \n\n Max retries reached."))
                     logging.error(f"Max retries reached due to Error: {e}")
                     raise e
         else:

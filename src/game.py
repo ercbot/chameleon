@@ -9,26 +9,33 @@ from models import *
 from player import Player
 from prompts import fetch_prompt, format_prompt
 
+from langchain_core.runnables import RunnableLambda
+from langchain_core.messages import AIMessage
+from controllers import controller_from_name
+
 # Default Values
 NUMBER_OF_PLAYERS = 6
 WINNING_SCORE = 11
 
 class Game:
+
     log_dir = os.path.join(os.pardir, "experiments")
-    player_log_file = "{player_id}.jsonl"
-    game_log_file = "{game_id}-game.jsonl"
+    """The directory where the logs will be saved."""
+    player_log_file_template = "{player_id}.jsonl"
+    """Template for the name of the log file for each player."""
+    game_log_file_template = "{game_id}-game.jsonl"
+    """Template for the name of the log file for the game."""
     number_of_players = NUMBER_OF_PLAYERS
     """The number of players in the game."""
     winning_score = WINNING_SCORE
     """The Number of points required to win the game."""
-    debug = True
-    """If True, the game will print debug messages to the console."""
 
     def __init__(
             self,
             number_of_players: int = NUMBER_OF_PLAYERS,
             human_name: str = None,
-            verbose = False
+            verbose: bool = False,
+            debug: bool = False
     ):
         # Game ID
         self.game_id = game_id()
@@ -48,16 +55,21 @@ class Game:
             self.human_index = None
 
         self.verbose = verbose
+        """If True, the game will display verbose messages to the player."""
+        self.debug = debug
+        """If True, the game will display debug messages to the player."""
 
         # Add Players
         self.players = []
         for i in range(0, number_of_players):
             if self.human_index == i:
                 name = human_name
-                controller = "human"
+                controller_name = "human"
+                controller = RunnableLambda(self.human_input)
             else:
                 name = ai_names.pop()
-                controller = "openai"
+                controller_name = "openai"
+                controller = controller_from_name(controller_name)
 
             if self.chameleon_index == i:
                 role = "chameleon"
@@ -66,12 +78,12 @@ class Game:
 
             player_id = f"{self.game_id}-{i + 1}"
 
-            log_path = os.path.join(
+            player_log_path = os.path.join(
                 self.log_dir,
-                self.player_log_file.format(player_id=player_id)
+                self.player_log_file_template.format(player_id=player_id)
             )
 
-            self.players.append(Player(name, controller, player_id, log_filepath=log_path))
+            self.players.append(Player(name, controller, controller_name, player_id, log_filepath=player_log_path))
 
         # Game State
         self.player_responses = []
@@ -102,7 +114,7 @@ class Game:
                     player.prompt_queue.append(message)
                     if player.controller_type == "human":
                         self.human_message(message)
-            if self.verbose:
+            if self.verbose and not self.human_index:
                 self.human_message(message)
         else:
             recipient.prompt_queue.append(message)
@@ -119,7 +131,13 @@ class Game:
     # The following methods are used to broadcast messages to a human.
     # They are design so that they can be overridden by a subclass for a different player interface.
     @staticmethod
-    def human_message(self, message: str):
+    def human_input(prompt: str) -> str:
+        """Gets input from the human player."""
+        response = AIMessage(content=input())
+        return response
+
+    @staticmethod
+    def human_message(message: str):
         """Sends a message for the human player to read. No response is expected."""
         print(message)
 
@@ -146,7 +164,7 @@ class Game:
             "number_of_players": len(self.players),
             "human_player": self.players[self.human_index].id if self.human_index else "None",
         }
-        game_log_path = os.path.join(self.log_dir, self.game_log_file.format(game_id=self.game_id))
+        game_log_path = os.path.join(self.log_dir, self.game_log_file_template.format(game_id=self.game_id))
 
         log(game_log, game_log_path)
 
@@ -166,11 +184,11 @@ class Game:
         for i, player in enumerate(self.players):
             if i == chameleon_index:
                 player.assign_role("chameleon")
-                self.game_message("You are the **Chameleon**, remain undetected and guess what animal the others are pretending to be", player)
+                self.game_message(fetch_prompt("assign_chameleon"), player)
                 self.debug_message(f"{player.name} is the Chameleon!")
             else:
                 player.assign_role("herd")
-                self.game_message(f"You are a **{herd_animal}**, keep this secret at all costs and figure which player is not really a {herd_animal}", player)
+                self.game_message(format_prompt("assign_herd", herd_animal=herd_animal), player)
 
         # Phase II: Collect Player Animal Descriptions
 
@@ -179,11 +197,7 @@ class Game:
             if current_player.controller_type != "human":
                 self.verbose_message(f"{current_player.name} is thinking...")
 
-            if i == 0:
-                prompt = "Your Response:"
-            else:
-                prompt = "It's your turn to describe yourself. Do not repeat responses from other players.\nYour Response:"
-
+            prompt = fetch_prompt("player_describe_animal")
 
             # Get Player Animal Description
             response = await self.instructional_message(prompt, current_player, AnimalDescriptionModel)
@@ -206,8 +220,6 @@ class Game:
 
         # Phase IV: The Herd Votes for who they think the Chameleon is
         self.game_message("The Chameleon has guessed the animal. Now the Herd will vote on who they think the chameleon is.")
-
-        self.game_message("The Chameleon has decided not to guess the animal. Now all players will vote on who they think the chameleon is.")
 
         player_votes = []
         for player in self.players:
