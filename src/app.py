@@ -1,19 +1,14 @@
 import asyncio
+from time import sleep
 
 import streamlit as st
+from langchain_core.messages import AIMessage
 
 from game import Game
 
-st.set_page_config(layout="wide", page_title="Chameleon", page_icon="🦎")
+st.set_page_config(layout="wide", page_title="Chameleon", page_icon="img/logo.svg")
+human_turn = False
 
-# CSS
-st.markdown("""
-<style>
-    [data-testid="stVerticalBlock"]:has(div.info_container) [data-testid="stMarkdownContainer"] p { 
-        text-align: center;
-    }        
-    </style>
-""", unsafe_allow_html=True)
 
 def display_message(message):
     if message["type"] == "game":
