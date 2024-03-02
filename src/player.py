@@ -12,30 +12,12 @@ from langchain_core.exceptions import OutputParserException
 from pydantic import BaseModel
 
 from game_utils import log
-from controllers import controller_from_name
+from message import Message
 
 Role = Literal["chameleon", "herd"]
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger("chameleon")
-
-
-# Lots of AI Libraries use HumanMessage and AIMessage as the base classes for their messages.
-# This doesn't make sense for our as Humans and AIs are both players in the game, meaning they have the same role.
-# The Langchain type field is used to convert to that syntax.
-class Message(BaseModel):
-    type: Literal["prompt", "player", "retry", "error"]
-    """The type of the message. Can be "prompt" or "player"."""
-    content: str
-    """The content of the message."""
-    @property
-    def langchain_type(self):
-        """Returns the langchain message type for the message."""
-        if self.type in ["prompt", "retry", "error"]:
-            return "human"
-        else:
-            return "ai"
-
 
 class Player:
 
@@ -104,7 +86,7 @@ class Player:
             # Clear the prompt queue
             self.prompt_queue = []
 
-        message = Message(type="prompt", content=prompt)
+        message = Message(type="game", content=prompt)
         output = await self.generate.ainvoke(message)
         if self.controller_type == "ai":
             retries = 0
@@ -165,7 +147,7 @@ class Player:
 
         prompt = prompt_template.invoke({"format_instructions": parser.get_format_instructions()})
 
-        message = Message(type="player", content=prompt.text)
+        message = Message(type="format", content=prompt.text)
 
         response = await self.generate.ainvoke(message)
 
