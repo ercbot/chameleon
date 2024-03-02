@@ -39,7 +39,7 @@ class Game:
     ):
         # Game ID
         self.game_id = game_id()
-        self.start_time = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        self.start_time = datetime.now().strftime('%y%m%d-%H%M%S')
         self.log_dir = os.path.join(self.log_dir, f"{self.start_time}-{self.game_id}")
         os.makedirs(self.log_dir, exist_ok=True)
 

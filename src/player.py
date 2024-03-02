@@ -12,21 +12,22 @@ from langchain_core.exceptions import OutputParserException
 from pydantic import BaseModel
 
 from game_utils import log
-from message import Message
+from message import Message, MessageType
 
 Role = Literal["chameleon", "herd"]
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger("chameleon")
 
+
 class Player:
 
     role: Role | None = None
-    """The role of the player in the game. Can be "chameleon" or "herd"."""
+    """The role of the player in the game. Can be "chameleon" or "herd". This changes every round."""
     rounds_played_as_chameleon: int = 0
-    """The number of times the player has been the chameleon."""
+    """The number of times the player has been the Chameleon."""
     rounds_played_as_herd: int = 0
-    """The number of times the player has been in the herd."""
+    """The number of times the player has been in the Herd."""
     points: int = 0
     """The number of points the player has."""
 
@@ -86,7 +87,7 @@ class Player:
             # Clear the prompt queue
             self.prompt_queue = []
 
-        message = Message(type="game", content=prompt)
+        message = self.player_message("prompt", prompt)
         output = await self.generate.ainvoke(message)
         if self.controller_type == "ai":
             retries = 0
@@ -96,11 +97,13 @@ class Player:
                 if retries < max_retries:
                     retries += 1
                     logger.warning(f"Player {self.id} failed to format response: {output} due to an exception: {e} \n\n Retrying {retries}/{max_retries}")
-                    self.add_to_history(Message(type="retry", content=f"Error formatting response: {e} \n\n Please try again."))
+                    retry_message = self.player_message("retry", f"Error formatting response: {e} \n\n Please try again.")
+                    self.add_to_history(retry_message)
                     output = await self.format_output.ainvoke({"output_format": output_format})
 
                 else:
-                    self.add_to_history(Message(type="error", content=f"Error formatting response: {e} \n\n Max retries reached."))
+                    error_message = self.player_message("error", f"Error formatting response: {e} \n\n Max retries reached.")
+                    self.add_to_history(error_message)
                     logging.error(f"Max retries reached due to Error: {e}")
                     raise e
         else:
@@ -109,6 +112,11 @@ class Player:
             output = output_format.model_validate({field_name: output.content})
 
         return output
+
+    def player_message(self, message_type: MessageType, content: str) -> Message:
+        """Creates a message assigned to the player."""
+        return Message(player_id=self.id, message_number=len(self.messages), type=message_type, content=content)
+
 
     def add_to_history(self, message: Message):
         self.messages.append(message)
@@ -128,10 +136,10 @@ class Player:
         if self.controller_type == "human":
             response = await self.controller.ainvoke(message.content)
         else:
-            formatted_messages = [(message.langchain_type, message.content) for message in self.messages]
+            formatted_messages = [message.to_controller() for message in self.messages]
             response = await self.controller.ainvoke(formatted_messages)
 
-        self.add_to_history(Message(type="player", content=response.content))
+        self.add_to_history(self.player_message("player", response.content))
 
         return response
 
@@ -147,7 +155,7 @@ class Player:
 
         prompt = prompt_template.invoke({"format_instructions": parser.get_format_instructions()})
 
-        message = Message(type="format", content=prompt.text)
+        message = self.player_message("format", prompt.text)
 
         response = await self.generate.ainvoke(message)
 
