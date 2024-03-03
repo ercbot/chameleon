@@ -8,14 +8,13 @@ from game_utils import *
 from models import *
 from player import Player
 from prompts import fetch_prompt, format_prompt
-
-from langchain_core.runnables import RunnableLambda
-from langchain_core.messages import AIMessage
-from controllers import controller_from_name
+from message import Message
+from agent_interfaces import HumanAgentCLI, OpenAIAgentInterface
 
 # Default Values
 NUMBER_OF_PLAYERS = 6
 WINNING_SCORE = 11
+
 
 class Game:
 
@@ -40,11 +39,6 @@ class Game:
         # Game ID
         self.game_id = game_id()
         self.start_time = datetime.now().strftime('%y%m%d-%H%M%S')
-        self.log_dir = os.path.join(self.log_dir, f"{self.start_time}-{self.game_id}")
-        os.makedirs(self.log_dir, exist_ok=True)
-
-        # Choose Chameleon
-        self.chameleon_index = random_index(number_of_players)
 
         # Gather Player Names
         if human_name:
@@ -62,28 +56,22 @@ class Game:
         # Add Players
         self.players = []
         for i in range(0, number_of_players):
-            if self.human_index == i:
-                name = human_name
-                controller_name = "human"
-                controller = RunnableLambda(self.human_input)
-            else:
-                name = ai_names.pop()
-                controller_name = "openai"
-                controller = controller_from_name(controller_name)
-
-            if self.chameleon_index == i:
-                role = "chameleon"
-            else:
-                role = "herd"
-
             player_id = f"{self.game_id}-{i + 1}"
 
-            player_log_path = os.path.join(
-                self.log_dir,
-                self.player_log_file_template.format(player_id=player_id)
-            )
+            if self.human_index == i:
+                name = human_name
+                interface = HumanAgentCLI(player_id)
+            else:
+                name = ai_names.pop()
+                interface = OpenAIAgentInterface(player_id)
 
-            self.players.append(Player(name, controller, controller_name, player_id, log_filepath=player_log_path))
+            self.players.append(Player(name, player_id, interface))
+
+        # Add Observer - an Agent who can see all the messages, but doesn't actually play
+        if self.verbose or self.debug and not self.human_index:
+            self.observer = HumanAgentCLI("{self.game_id}-observer")
+        else:
+            self.observer = None
 
         # Game State
         self.player_responses = []
@@ -101,55 +89,43 @@ class Game:
 
             return formatted_responses
 
+    def observer_message(self, message: Message):
+        """Sends a message to the observer if there is one."""
+        if self.observer:
+            self.observer.add_message(message)
 
     def game_message(
-            self, message: str,
+            self, content: str,
             recipient: Optional[Player] = None,  # If None, message is broadcast to all players
             exclude: bool = False  # If True, the message is broadcast to all players except the chosen player
     ):
         """Sends a message to a player. No response is expected, however it will be included next time the player is prompted"""
+        message = Message(type="info", content=content)
+
         if exclude or not recipient:
             for player in self.players:
                 if player != recipient:
-                    player.prompt_queue.append(message)
-                    if player.controller_type == "human":
-                        self.human_message(message)
-            if self.verbose and not self.human_index:
-                self.human_message(message)
+                    player.interface.add_message(message)
+            self.observer_message(message)
         else:
-            recipient.prompt_queue.append(message)
-            if recipient.controller_type == "human":
-                self.human_message(message)
+            recipient.interface.add_message(message)
 
-    async def instructional_message(self, message: str, player: Player,  output_format: Type[BaseModel]):
-        """Sends a message to a specific player and gets their response."""
-        if player.controller_type == "human":
-            self.human_message(message)
-        response = await player.respond_to(message, output_format)
-        return response
-
-    # The following methods are used to broadcast messages to a human.
-    # They are design so that they can be overridden by a subclass for a different player interface.
-    @staticmethod
-    async def human_input(prompt: str) -> AIMessage:
-        """Gets input from the human player."""
-        response = AIMessage(content=input())
-        return response
-
-    @staticmethod
-    def human_message(message: str):
-        """Sends a message for the human player to read. No response is expected."""
-        print(message)
-
-    def verbose_message(self, message: str):
+    def verbose_message(self, content: str):
         """Sends a message for the human player to read. No response is expected."""
         if self.verbose:
-            print(Fore.GREEN + message + Style.RESET_ALL)
+            message = Message(type="verbose", content=content)
+            if self.human_index:
+                self.players[self.human_index].interface.add_message(message)
+            self.observer_message(message)
 
-    def debug_message(self, message: str):
+    def debug_message(self, content: str):
         """Sends a message for a human observer. These messages contain secret information about the players such as their role."""
         if self.debug:
-            print(Fore.YELLOW + "DEBUG: " + message + Style.RESET_ALL)
+            message = Message(type="debug", content=content)
+            if self.human_index:
+                self.players[self.human_index].interface.add_message(message)
+            self.observer_message(message)
+
 
     async def start(self):
         """Sets up the game. This includes assigning roles and gathering player names."""
@@ -167,8 +143,6 @@ class Game:
         game_log_path = os.path.join(self.log_dir, self.game_log_file_template.format(game_id=self.game_id))
 
         log(game_log, game_log_path)
-
-
 
     async def run_round(self):
         """Starts the round."""
@@ -194,13 +168,14 @@ class Game:
 
         self.game_message(f"Each player will now take turns describing themselves:")
         for i, current_player in enumerate(self.players):
-            if current_player.controller_type != "human":
+            if current_player.interface.is_ai:
                 self.verbose_message(f"{current_player.name} is thinking...")
 
             prompt = fetch_prompt("player_describe_animal")
 
             # Get Player Animal Description
-            response = await self.instructional_message(prompt, current_player, AnimalDescriptionModel)
+            message = Message(type="prompt", content=prompt)
+            response = current_player.interface.respond_to_formatted(message, AnimalDescriptionModel)
 
             self.player_responses.append({"sender": current_player.name, "response": response.description})
 
@@ -209,12 +184,13 @@ class Game:
         # Phase III: Chameleon Guesses the Animal
 
         self.game_message("All players have spoken. The Chameleon will now guess the secret animal...")
-        if self.human_index != self.chameleon_index:
+        if chameleon.interface.is_ai or self.observer:
             self.verbose_message("The Chameleon is thinking...")
 
         prompt = fetch_prompt("chameleon_guess_animal")
 
-        response = await self.instructional_message(prompt, chameleon, ChameleonGuessAnimalModel)
+        message = Message(type="prompt", content=prompt)
+        response = chameleon.interface.respond_to_formatted(message, ChameleonGuessAnimalModel)
 
         chameleon_animal_guess = response.animal
 
@@ -224,19 +200,20 @@ class Game:
         player_votes = []
         for player in self.players:
             if player.role == "herd":
-                if player.is_ai():
+                if player.interface.is_ai:
                     self.verbose_message(f"{player.name} is thinking...")
 
                 prompt = format_prompt("vote", player_responses=self.format_responses(exclude=player.name))
 
                 # Get Player Vote
-                response = await self.instructional_message(prompt, player, VoteModel)
+                message = Message(type="prompt", content=prompt)
+                response = player.interface.respond_to_formatted(message, VoteModel)
 
                 # check if a valid player was voted for...
 
                 # Add Vote to Player Votes
                 player_votes.append({"voter": player, "vote": response.vote})
-                if player.is_ai():
+                if player.interface.is_ai:
                     self.debug_message(f"{player.name} voted for {response.vote}")
 
 
@@ -285,7 +262,7 @@ class Game:
         # Log Round Info
         round_log = {
             "herd_animal": herd_animal,
-            "chameleon_name": self.players[self.chameleon_index].name,
+            "chameleon_name": chameleon.name,
             "chameleon_guess": chameleon_animal_guess,
             "herd_votes": player_votes,
         }
