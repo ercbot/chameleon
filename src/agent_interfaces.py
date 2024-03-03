@@ -5,16 +5,9 @@ from openai import OpenAI
 from colorama import Fore, Style
 from pydantic import BaseModel, ValidationError
 
+from output_formats import OutputFormat, OutputFormatModel
 from message import Message, AgentMessage
 from data_collection import save
-
-FORMAT_INSTRUCTIONS = """The output should be reformatted as a JSON instance that conforms to the JSON schema below.
-Here is the output schema:
-```
-{schema}
-```
-"""
-
 
 class BaseAgentInterface:
     """
@@ -44,11 +37,11 @@ class BaseAgentInterface:
         self.add_message(response)
         return response
 
-    def respond_to_formatted(self, message: Message, output_format: Type[BaseModel], max_retries = 3) -> Type[BaseModel]:
+    def respond_to_formatted(self, message: Message, output_format: OutputFormat, max_retries = 3) -> OutputFormatModel:
         """Adds a message to the message history, and generates a response matching the provided format."""
         initial_response = self.respond_to(message)
 
-        reformat_message = Message(type="format", content=self._get_format_instructions(output_format))
+        reformat_message = Message(type="format", content=output_format.get_format_instructions())
 
         output = None
         retries = 0
@@ -56,11 +49,17 @@ class BaseAgentInterface:
         while not output and retries < max_retries:
             try:
                 formatted_response = self.respond_to(reformat_message)
-                output = output_format.model_validate_json(formatted_response.content)
+                output = output_format.output_format_model.model_validate_json(formatted_response.content)
             except ValidationError as e:
                 if retries > max_retries:
                     raise e
-                reformat_message = Message(type="retry", content=f"Error formatting response: {e} \n\n Please try again.")
+                retry_message = Message(type="retry", content=f"Error formatting response: {e} \n\n Please try again.")
+                if output_format.few_shot_examples:
+                    self.add_message(retry_message)
+                    reformat_message = Message(type="few_shot", content=output_format.get_few_shot()) # not implemented
+                else:
+                    reformat_message = retry_message
+
                 retries += 1
 
         return output
@@ -74,23 +73,6 @@ class BaseAgentInterface:
     @property
     def is_ai(self):
         return not self.is_human
-
-    # This should probably be put on a theoretical output format class...
-    # Or maybe on the Message class with a from format constructor
-    @staticmethod
-    def _get_format_instructions(output_format: Type[BaseModel]):
-        schema = output_format.model_json_schema()
-
-        reduced_schema = schema
-        if "title" in reduced_schema:
-            del reduced_schema["title"]
-        if "type" in reduced_schema:
-            del reduced_schema["type"]
-
-        schema_str = json.dumps(reduced_schema, indent=4)
-
-        return FORMAT_INSTRUCTIONS.format(schema=schema_str)
-
 
 AgentInterface = NewType("AgentInterface", BaseAgentInterface)
 

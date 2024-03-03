@@ -5,7 +5,7 @@ from typing import Optional, Type
 from colorama import Fore, Style
 
 from game_utils import *
-from models import *
+from output_formats import *
 from player import Player
 from prompts import fetch_prompt, format_prompt
 from message import Message
@@ -175,7 +175,7 @@ class Game:
 
             # Get Player Animal Description
             message = Message(type="prompt", content=prompt)
-            response = current_player.interface.respond_to_formatted(message, AnimalDescriptionModel)
+            response = current_player.interface.respond_to_formatted(message, OutputFormat(AnimalDescriptionFormat))
 
             self.player_responses.append({"sender": current_player.name, "response": response.description})
 
@@ -190,7 +190,7 @@ class Game:
         prompt = fetch_prompt("chameleon_guess_animal")
 
         message = Message(type="prompt", content=prompt)
-        response = chameleon.interface.respond_to_formatted(message, ChameleonGuessAnimalModel)
+        response = chameleon.interface.respond_to_formatted(message, OutputFormat(ChameleonGuessFormat))
 
         chameleon_animal_guess = response.animal
 
@@ -207,9 +207,8 @@ class Game:
 
                 # Get Player Vote
                 message = Message(type="prompt", content=prompt)
-                response = player.interface.respond_to_formatted(message, VoteModel)
-
-                # check if a valid player was voted for...
+                player_names = [p.name for p in self.players]
+                response = player.interface.respond_to_formatted(message, OutputFormat(HerdVoteFormat, player_names))
 
                 # Add Vote to Player Votes
                 player_votes.append({"voter": player, "vote": response.vote})

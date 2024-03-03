@@ -1,64 +1,11 @@
-from models import *
-from langchain.prompts.few_shot import FewShotPromptTemplate
-from langchain.prompts.prompt import PromptTemplate
-
-
 def fetch_prompt(prompt_name):
     """Fetches a static prompt."""
     return prompts[prompt_name]
+
+
 def format_prompt(prompt_name, **kwargs):
     """Fetches a template prompt and populates it."""
     return fetch_prompt(prompt_name).format(**kwargs)
-
-
-class Task:
-    def __init__(self, prompt: str, response_format: Type[BaseModel], few_shot_examples: List[dict] = None):
-        self.prompt = prompt
-        self.response_format = response_format
-        self.few_shot_examples = few_shot_examples
-
-    def full_prompt(self, **kwargs):
-        prompt = self.prompt.format(**kwargs)
-
-        format_instructions = self.get_format_instructions()
-        if self.few_shot_examples:
-            few_shot = self.get_few_shot()
-
-    def get_format_instructions(self):
-        schema = self.get_input_schema()
-        format_instructions = FORMAT_INSTRUCTIONS.format(schema=schema)
-
-        return format_instructions
-
-    def get_input_schema(self):
-        schema = self.response_format.model_json_schema()
-
-        reduced_schema = schema
-        if "title" in reduced_schema:
-            del reduced_schema["title"]
-        if "type" in reduced_schema:
-            del reduced_schema["type"]
-
-        schema_str = json.dumps(reduced_schema, indent=4)
-
-        return schema_str
-
-    def get_few_shot(self, max_examples=3):
-        if len(self.few_shot_examples) <= max_examples:
-            examples = self.few_shot_examples
-        else:
-            examples = random.sample(self.few_shot_examples, max_examples)
-
-        few_shot = "\n\n".join([self.format_example(ex) for ex in examples])
-
-        return few_shot
-
-    def format_example(self, example):
-        ex_prompt = self.prompt.format(**example['inputs'])
-        ex_response = example['response']
-
-        return f"Prompt: {ex_prompt}\nResponse: {ex_response}"
-
 
 
 _game_rules = '''\
