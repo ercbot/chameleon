@@ -6,6 +6,7 @@ from colorama import Fore, Style
 from pydantic import BaseModel, ValidationError
 
 from message import Message, AgentMessage
+from data_collection import save
 
 FORMAT_INSTRUCTIONS = """The output should be reformatted as a JSON instance that conforms to the JSON schema below.
 Here is the output schema:
@@ -33,6 +34,7 @@ class BaseAgentInterface:
     def add_message(self, message: Message):
         """Adds a message to the message history, without generating a response."""
         bound_message = AgentMessage.from_message(message, self.id, len(self.messages))
+        save(bound_message)
         self.messages.append(bound_message)
 
     def respond_to(self, message: Message) -> Message:
