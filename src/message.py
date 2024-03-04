@@ -11,7 +11,7 @@ class Message(BaseModel):
     content: str
     """The content of the message."""
 
-    @computed_field
+    @property
     def conversation_role(self) -> str:
         """The message type in the format used by the LLM."""
 
@@ -20,7 +20,7 @@ class Message(BaseModel):
         # This can be counterintuitive since they can be controlled by either human or ai
         # Further, The programmatic messages from the game are always "user"
 
-        if self.type in ["prompt", "retry", "error", "format"]:
+        if self.type != "agent":
             return "user"
         else:
             return "assistant"

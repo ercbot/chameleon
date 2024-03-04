@@ -9,6 +9,7 @@ from output_formats import OutputFormat, OutputFormatModel
 from message import Message, AgentMessage
 from data_collection import save
 
+
 class BaseAgentInterface:
     """
     The interface that agents use to receive info from and interact with the game.
@@ -37,7 +38,13 @@ class BaseAgentInterface:
         self.add_message(response)
         return response
 
-    def respond_to_formatted(self, message: Message, output_format: OutputFormat, max_retries = 3) -> OutputFormatModel:
+    def respond_to_formatted(
+            self,
+            message: Message,
+            output_format: OutputFormat,
+            max_retries=3,
+            **kwargs
+    ) -> OutputFormatModel:
         """Adds a message to the message history, and generates a response matching the provided format."""
         initial_response = self.respond_to(message)
 
@@ -49,16 +56,18 @@ class BaseAgentInterface:
         while not output and retries < max_retries:
             try:
                 formatted_response = self.respond_to(reformat_message)
-                output = output_format.output_format_model.model_validate_json(formatted_response.content)
+                if kwargs:
+                    fields = json.loads(formatted_response.content)
+                    fields.update(kwargs)
+                    output = output_format.model_validate(fields)
+                else:
+                    output = output_format.model_validate_json(formatted_response.content)
+
             except ValidationError as e:
                 if retries > max_retries:
                     raise e
                 retry_message = Message(type="retry", content=f"Error formatting response: {e} \n\n Please try again.")
-                if output_format.few_shot_examples:
-                    self.add_message(retry_message)
-                    reformat_message = Message(type="few_shot", content=output_format.get_few_shot()) # not implemented
-                else:
-                    reformat_message = retry_message
+                reformat_message = retry_message
 
                 retries += 1
 
@@ -74,11 +83,13 @@ class BaseAgentInterface:
     def is_ai(self):
         return not self.is_human
 
+
 AgentInterface = NewType("AgentInterface", BaseAgentInterface)
 
 
 class OpenAIAgentInterface(BaseAgentInterface):
     """An interface that uses the OpenAI API (or compatible 3rd parties) to generate responses."""
+
     def __init__(self, agent_id: str, model_name: str = "gpt-3.5-turbo"):
         super().__init__(agent_id)
         self.model_name = model_name
@@ -97,15 +108,16 @@ class OpenAIAgentInterface(BaseAgentInterface):
 
 
 class HumanAgentInterface(BaseAgentInterface):
-
     is_human = True
 
     def respond_to_formatted(self, message: Message, output_format: OutputFormat, **kwargs) -> OutputFormatModel:
         """For Human agents, we can trust them enough to format their own responses... for now"""
         response = super().respond_to(message)
         # only works because current outputs have only 1 field...
-        field_name = output_format.output_format_model.model_fields.copy().popitem()[0]
-        output = output_format.output_format_model.model_validate({field_name: response.content})
+        fields = {output_format.model_fields.copy().popitem()[0], response.content}
+        if kwargs:
+            fields.update(kwargs)
+        output = output_format.model_validate(fields)
 
         return output
 

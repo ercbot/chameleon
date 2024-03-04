@@ -13,7 +13,7 @@ from agent_interfaces import HumanAgentCLI, OpenAIAgentInterface
 
 # Default Values
 NUMBER_OF_PLAYERS = 6
-WINNING_SCORE = 11
+WINNING_SCORE = 3
 
 
 class Game:
@@ -131,7 +131,17 @@ class Game:
         """Sets up the game. This includes assigning roles and gathering player names."""
         self.game_message(fetch_prompt("game_rules"))
 
-        await self.run_round()
+        winner = None
+        round_number = 0
+
+        while not winner:
+            round_results = await self.run_round()
+            round_number += 1
+
+            # Check for a Winner
+            for player in self.players:
+                if player.points >= self.winning_score:
+                    winner = player # ignoring the possibility of a tie for now
 
         # Log Game Info
         game_log = {
@@ -144,7 +154,7 @@ class Game:
 
         log(game_log, game_log_path)
 
-    async def run_round(self):
+    async def run_round(self) -> dict:
         """Starts the round."""
 
         # Phase I: Choose Animal and Assign Roles
@@ -175,7 +185,7 @@ class Game:
 
             # Get Player Animal Description
             message = Message(type="prompt", content=prompt)
-            response = current_player.interface.respond_to_formatted(message, OutputFormat(AnimalDescriptionFormat))
+            response = current_player.interface.respond_to_formatted(message, AnimalDescriptionFormat)
 
             self.player_responses.append({"sender": current_player.name, "response": response.description})
 
@@ -190,7 +200,7 @@ class Game:
         prompt = fetch_prompt("chameleon_guess_animal")
 
         message = Message(type="prompt", content=prompt)
-        response = chameleon.interface.respond_to_formatted(message, OutputFormat(ChameleonGuessFormat))
+        response = chameleon.interface.respond_to_formatted(message, ChameleonGuessFormat)
 
         chameleon_animal_guess = response.animal
 
@@ -208,13 +218,12 @@ class Game:
                 # Get Player Vote
                 message = Message(type="prompt", content=prompt)
                 player_names = [p.name for p in self.players]
-                response = player.interface.respond_to_formatted(message, OutputFormat(HerdVoteFormat, player_names))
+                response = player.interface.respond_to_formatted(message, HerdVoteFormat, player_names=player_names)
 
                 # Add Vote to Player Votes
                 player_votes.append({"voter": player, "vote": response.vote})
                 if player.interface.is_ai:
                     self.debug_message(f"{player.name} voted for {response.vote}")
-
 
         self.game_message("All players have voted!")
         formatted_votes = '\n'.join([f'{vote["voter"].name}: {vote["vote"]}' for vote in player_votes])
@@ -225,7 +234,7 @@ class Game:
 
         # Phase V: Assign Points
 
-        self.game_message(f"The round is over. Caclulating results...")
+        self.game_message(f"The round is over. Calculating results...")
         self.game_message(
             f"The Chameleon was {chameleon.name}, and they guessed the secret animal was {chameleon_animal_guess}.")
         self.game_message(f"The secret animal was actually was {herd_animal}.")
@@ -259,8 +268,7 @@ class Game:
 
         self.game_message(f"Current Game Score: {player_points}")
 
-        # Log Round Info
-        round_log = {
+        return {
             "herd_animal": herd_animal,
             "chameleon_name": chameleon.name,
             "chameleon_guess": chameleon_animal_guess,

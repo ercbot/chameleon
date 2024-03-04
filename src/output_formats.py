@@ -2,52 +2,33 @@ import random
 from typing import Annotated, NewType, List, Optional, Type, Literal
 import json
 
-from pydantic import BaseModel, field_validator, Field
+from pydantic import BaseModel, field_validator, Field, model_validator
 
 FORMAT_INSTRUCTIONS = """Please reformat your previous response as a JSON instance that conforms to the JSON structure below.
 Here is the output format:
 {schema}
 """
-FEW_SHOT_INSTRUCTIONS = """Here are a few examples of correctly formatted responses: \n
-{examples}
-"""
-
-OutputFormatModel = NewType("OutputFormatModel", BaseModel)
 
 
-class OutputFormat:
-    """The base class for all output formats."""
+class OutputFormatModel(BaseModel):
+    @classmethod
+    def get_format_instructions(cls) -> str:
+        """Returns a string with instructions on how to format the output."""
+        json_format = {}
+        for field in cls.model_fields:
+            if not cls.model_fields[field].exclude:
+                json_format[field] = cls.model_fields[field].description
 
-    format_instructions: str = FORMAT_INSTRUCTIONS
-    """Instructions for formatting the output, it is combined with the JSON schema of the output format."""
-    few_shot_instructions: str = FEW_SHOT_INSTRUCTIONS
-    """Instructions for the few shot examples, it is combined with the few shot examples."""
-    few_shot_examples: Optional[List[dict]] = None
-    """A list of examples to be shown to the agent to help them understand the desired format of the output."""
-
-    def __init__(self, output_format_model: Type[OutputFormatModel], player_names: List[str] = None):
-        self.output_format_model = output_format_model
-        self.output_format_model.player_names = player_names
-
-    def get_format_instructions(self) -> str:
-        json_format = self.output_format_model().model_dump_json()
-
-        return self.format_instructions.format(schema=json_format)
-
-    def get_few_shot(self, max_examples=3):
-        if len(self.few_shot_examples) <= max_examples:
-            examples = self.few_shot_examples
-        else:
-            examples = random.sample(self.few_shot_examples, max_examples)
-
-        few_shot = "\n\n".join([f"Example Response:\n{json.dumps(example)}" for example in examples])
-
-        return self.few_shot_instructions.format(examples=few_shot)
+        # In the future, we could instead use get_annotations() to get the field descriptions
+        return FORMAT_INSTRUCTIONS.format(schema=json_format)
 
 
-class AnimalDescriptionFormat(BaseModel):
+OutputFormat = NewType("OutputFormat", OutputFormatModel)
+
+
+class AnimalDescriptionFormat(OutputFormatModel):
     # Define fields of our class here
-    description: str = Field("A brief description of the animal")
+    description: str = Field(description="A brief description of the animal")
     """A brief description of the animal"""
 
     @field_validator('description')
@@ -58,8 +39,8 @@ class AnimalDescriptionFormat(BaseModel):
         return v
 
 
-class ChameleonGuessFormat(BaseModel):
-    animal: str = Field("The name of the animal you think the chameleon is")
+class ChameleonGuessFormat(OutputFormatModel):
+    animal: str = Field(description='Name of the animal you think the Herd is in its singular form, e.g. "animal" not "animals"')
 
     @field_validator('animal')
     @classmethod
@@ -69,15 +50,14 @@ class ChameleonGuessFormat(BaseModel):
         return v
 
 
-class HerdVoteFormat(BaseModel):
+class HerdVoteFormat(OutputFormatModel):
     player_names: List[str] = Field([], exclude=True)
     """The names of the players in the game"""
-    vote: str = Field("The name of the player you are voting for")
+    vote: str = Field(description="The name of the player you are voting for")
     """The name of the player you are voting for"""
 
-    @field_validator('vote')
-    @classmethod
-    def check_player_exists(cls, v) -> str:
-        if v.lower() not in [player.lower() for player in cls.player_names]:
-            raise ValueError(f"Player {v} does not exist")
-        return v
+    @model_validator(mode="after")
+    def check_player_exists(self) -> "HerdVoteFormat":
+        if self.vote.lower() not in [player.lower() for player in self.player_names]:
+            raise ValueError(f"Player {self.vote} does not exist, please vote for one of {self.player_names}")
+        return self
