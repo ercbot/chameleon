@@ -37,16 +37,9 @@ Below are the responses from all the other players.
 {player_responses}
 """
 
-_chameleon_guess_decision = """\
-You now have the opportunity to guess what animal the other players are pretending to be.
-If you guess correctly you will WIN, if you guess incorrectly you will LOSE.
-If you believe you know what animal the other players are pretending to be make choose to GUESS, otherwise choose to PASS.
-Your response should be one of ("GUESS", "PASS")
-Your Response: 
-"""
-
 _chameleon_guess_animal = """\
 What animal do you think the other players are pretending to be?
+Guess the name of the animal not it's plural form e.g. guess "animal" not "animals"
 """
 
 _vote_prompt = """\
@@ -58,7 +51,6 @@ prompts = {
     "assign_herd": _assign_herd,
     "assign_chameleon": _assign_chameleon,
     "player_describe_animal": _player_describe_animal,
-    "chameleon_guess_decision": _all_responses + _chameleon_guess_decision,
     "chameleon_guess_animal": _chameleon_guess_animal,
     "response": "Your response:",
     "vote": _all_responses + _vote_prompt

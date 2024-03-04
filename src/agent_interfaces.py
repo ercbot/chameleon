@@ -100,12 +100,12 @@ class HumanAgentInterface(BaseAgentInterface):
 
     is_human = True
 
-    def respond_to_formatted(self, message: Message, output_format: Type[BaseModel], **kwargs) -> Type[BaseModel]:
+    def respond_to_formatted(self, message: Message, output_format: OutputFormat, **kwargs) -> OutputFormatModel:
         """For Human agents, we can trust them enough to format their own responses... for now"""
         response = super().respond_to(message)
         # only works because current outputs have only 1 field...
-        field_name = output_format.model_fields.copy().popitem()[0]
-        output = output_format.model_validate({field_name: response.content})
+        field_name = output_format.output_format_model.model_fields.copy().popitem()[0]
+        output = output_format.output_format_model.model_validate({field_name: response.content})
 
         return output
 

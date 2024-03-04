@@ -79,10 +79,10 @@ class ChameleonGuessFormat(BaseModel):
 
 
 class HerdVoteFormat(BaseModel):
-    vote: str = Field("The name of the player you are voting for")
-    """The name of the player you are voting for"""
     player_names: List[str] = Field([], exclude=True)
     """The names of the players in the game"""
+    vote: str = Field("The name of the player you are voting for")
+    """The name of the player you are voting for"""
 
     @field_validator('vote')
     @classmethod

@@ -68,7 +68,7 @@ class Game:
             self.players.append(Player(name, player_id, interface))
 
         # Add Observer - an Agent who can see all the messages, but doesn't actually play
-        if self.verbose or self.debug and not self.human_index:
+        if (self.verbose or self.debug) and not self.human_index:
             self.observer = HumanAgentCLI("{self.game_id}-observer")
         else:
             self.observer = None
@@ -238,6 +238,7 @@ class Game:
         # Point Logic
         # If the Chameleon guesses the correct animal    =   +1 Point to the Chameleon
         if chameleon_animal_guess.lower() == herd_animal.lower():
+
             chameleon.points += 1
         # If the Chameleon guesses the incorrect animal  =   +1 Point to each Herd player
         else:
