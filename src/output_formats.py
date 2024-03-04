@@ -4,7 +4,6 @@ import json
 
 from pydantic import BaseModel, field_validator, Field
 
-MAX_DESCRIPTION_LEN = 10
 FORMAT_INSTRUCTIONS = """Please reformat your previous response as a JSON instance that conforms to the JSON structure below.
 Here is the output format:
 {schema}
@@ -56,14 +55,6 @@ class AnimalDescriptionFormat(BaseModel):
     def check_starting_character(cls, v) -> str:
         if not v[0].upper() == 'I':
             raise ValueError("Description must begin with 'I'")
-        return v
-
-    @field_validator('description')
-    @classmethod
-    def wordcount(cls, v) -> str:
-        count = len(v.split())
-        if count > MAX_DESCRIPTION_LEN:
-            raise ValueError(f"Animal Description must be {MAX_DESCRIPTION_LEN} words or less")
         return v
 
 
