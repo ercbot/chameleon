@@ -1,4 +1,5 @@
 import os
+import pathlib
 from typing import NewType
 
 import pydantic
@@ -8,10 +9,12 @@ import player
 
 from pydantic import BaseModel
 
+
+
 Model = NewType("Model", BaseModel)
 
 
-data_dir = os.path.join(os.pardir, "data")
+data_dir = pathlib.Path(__file__).parent.parent / "data"
 
 
 def save(log_object: Model):
