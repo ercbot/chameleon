@@ -20,7 +20,7 @@ class OutputFormatModel(BaseModel):
                 json_format[field] = cls.model_fields[field].description
 
         # In the future, we could instead use get_annotations() to get the field descriptions
-        return FORMAT_INSTRUCTIONS.format(schema=json_format)
+        return FORMAT_INSTRUCTIONS.format(schema=json.dumps(json_format))
 
 
 class AnimalDescriptionFormat(OutputFormatModel):
@@ -37,7 +37,7 @@ class AnimalDescriptionFormat(OutputFormatModel):
 
 
 class ChameleonGuessFormat(OutputFormatModel):
-    animal: str = Field(description='Name of the animal you think the Herd is in its singular form, e.g. "animal" not "animals"')
+    animal: str = Field(description="Name of the animal you think the Herd is in its singular form, e.g. 'animal' not 'animals'")
 
     @field_validator('animal')
     @classmethod
