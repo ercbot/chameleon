@@ -5,7 +5,7 @@ from openai import OpenAI
 from colorama import Fore, Style
 from pydantic import BaseModel, ValidationError
 
-from output_formats import OutputFormat, OutputFormatModel
+from output_formats import OutputFormatModel
 from message import Message, AgentMessage
 from data_collection import save
 
