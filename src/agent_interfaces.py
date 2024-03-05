@@ -1,3 +1,4 @@
+from json import JSONDecodeError
 from typing import Type, NewType
 import json
 
@@ -63,7 +64,7 @@ class BaseAgentInterface:
                 else:
                     output = output_format.model_validate_json(formatted_response.content)
 
-            except ValidationError as e:
+            except ValidationError or JSONDecodeError as e:
                 if retries > max_retries:
                     raise e
                 retry_message = Message(type="retry", content=f"Error formatting response: {e} \n\n Please try again.")
