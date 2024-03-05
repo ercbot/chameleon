@@ -23,9 +23,6 @@ class OutputFormatModel(BaseModel):
         return FORMAT_INSTRUCTIONS.format(schema=json_format)
 
 
-OutputFormat = NewType("OutputFormat", OutputFormatModel)
-
-
 class AnimalDescriptionFormat(OutputFormatModel):
     # Define fields of our class here
     description: str = Field(description="A brief description of the animal")

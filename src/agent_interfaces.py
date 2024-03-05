@@ -41,7 +41,7 @@ class BaseAgentInterface:
     def respond_to_formatted(
             self,
             message: Message,
-            output_format: OutputFormat,
+            output_format: Type[OutputFormatModel],
             max_retries=3,
             **kwargs
     ) -> OutputFormatModel:
