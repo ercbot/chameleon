@@ -9,7 +9,7 @@ from output_formats import *
 from player import Player
 from prompts import fetch_prompt, format_prompt
 from message import Message
-from agent_interfaces import HumanAgentCLI, OpenAIAgentInterface
+from agent_interfaces import HumanAgentCLI, OpenAIAgentInterface, HumanAgentInterface
 
 # Default Values
 NUMBER_OF_PLAYERS = 6
@@ -17,22 +17,26 @@ WINNING_SCORE = 3
 
 
 class Game:
+    """The main game class, handles the game logic and player interactions."""
 
-    log_dir = os.path.join(os.pardir, "experiments")
-    """The directory where the logs will be saved."""
-    player_log_file_template = "{player_id}.jsonl"
-    """Template for the name of the log file for each player."""
-    game_log_file_template = "{game_id}-game.jsonl"
-    """Template for the name of the log file for the game."""
     number_of_players = NUMBER_OF_PLAYERS
     """The number of players in the game."""
     winning_score = WINNING_SCORE
     """The Number of points required to win the game."""
+    chameleon_ids: List[str] = []
+    """Record of which player was the chameleon for each round."""
+    herd_animals: List[str] = []
+    """Record of what animal was the herd animal for each round."""
+    chameleon_guesses: List[str] = []
+    """Record of what animal the chameleon guessed for each round."""
+    herd_vote_tallies: List[List[dict]] = []
+    """Record of the votes of each herd member for the chameleon for each round."""
 
     def __init__(
             self,
             number_of_players: int = NUMBER_OF_PLAYERS,
             human_name: str = None,
+            human_interface: Type[HumanAgentInterface] = HumanAgentCLI,
             verbose: bool = False,
             debug: bool = False
     ):
@@ -48,24 +52,25 @@ class Game:
             ai_names = random_names(number_of_players)
             self.human_index = None
 
-        self.verbose = verbose
-        """If True, the game will display verbose messages to the player."""
-        self.debug = debug
-        """If True, the game will display debug messages to the player."""
-
         # Add Players
         self.players = []
+
         for i in range(0, number_of_players):
             player_id = f"{self.game_id}-{i + 1}"
 
             if self.human_index == i:
                 name = human_name
-                interface = HumanAgentCLI(player_id)
+                interface = human_interface(player_id)
             else:
                 name = ai_names.pop()
                 interface = OpenAIAgentInterface(player_id)
 
             self.players.append(Player(name, player_id, interface))
+
+        self.verbose = verbose
+        """If True, the game will display verbose messages to the player."""
+        self.debug = debug
+        """If True, the game will display debug messages to the player."""
 
         # Add Observer - an Agent who can see all the messages, but doesn't actually play
         if (self.verbose or self.debug) and not self.human_index:
@@ -73,21 +78,33 @@ class Game:
         else:
             self.observer = None
 
-        # Game State
-        self.player_responses = []
+    def player_from_id(self, player_id: str) -> Player:
+        """Returns a player from their ID."""
+        return next((player for player in self.players if player.id == player_id), None)
 
-    def format_responses(self, exclude: str = None) -> str:
-        """Formats the responses of the players into a single string."""
-        if len(self.player_responses) == 0:
-            return "None, you are the first player!"
-        else:
-            formatted_responses = ""
-            for response in self.player_responses:
-                # Used to exclude the player who is currently responding, so they don't vote for themselves like a fool
-                if response["sender"] != exclude:
-                    formatted_responses += f" - {response['sender']}: {response['response']}\n"
+    def player_from_name(self, name: str) -> Player:
+        """Returns a player from their name."""
+        return next((player for player in self.players if player.name == name), None)
 
-            return formatted_responses
+    @property
+    def chameleon(self) -> Player:
+        """Returns the current chameleon."""
+        return self.player_from_id(self.chameleon_ids[-1])
+
+    @property
+    def herd_animal(self) -> str:
+        """Returns the current herd animal."""
+        return self.herd_animals[-1]
+
+    @property
+    def chameleon_guess(self) -> str:
+        """Returns the current chameleon guess."""
+        return self.chameleon_guesses[-1]
+
+    @property
+    def herd_vote_tally(self) -> List[dict]:
+        """Returns the current herd vote tally."""
+        return self.herd_vote_tallies[-1]
 
     def observer_message(self, message: Message):
         """Sends a message to the observer if there is one."""
@@ -134,36 +151,39 @@ class Game:
         winner = None
         round_number = 0
 
-        while not winner:
-            round_results = await self.run_round()
-            round_number += 1
+        # while not winner:
+        #     round_results = await self.run_round()
+        #     round_number += 1
 
-            # Check for a Winner
-            for player in self.players:
-                if player.points >= self.winning_score:
-                    winner = player # ignoring the possibility of a tie for now
+            # # Check for a Winner
+            # for player in self.players:
+            #     if player.points >= self.winning_score:
+            #         winner = player # ignoring the possibility of a tie for now
 
-        # Log Game Info
-        game_log = {
-            "game_id": self.game_id,
-            "start_time": self.start_time,
-            "number_of_players": len(self.players),
-            "human_player": self.players[self.human_index].id if self.human_index else "None",
-        }
-        game_log_path = os.path.join(self.log_dir, self.game_log_file_template.format(game_id=self.game_id))
+        self.setup_round()
 
-        log(game_log, game_log_path)
+        self.run_round()
 
-    async def run_round(self) -> dict:
-        """Starts the round."""
+        self.resolve_round()
 
-        # Phase I: Choose Animal and Assign Roles
+        # # Log Game Info
+        # game_log = {
+        #     "game_id": self.game_id,
+        #     "start_time": self.start_time,
+        #     "number_of_players": len(self.players),
+        #     "human_player": self.players[self.human_index].id if self.human_index else "None",
+        # }
 
+    def setup_round(self):
+        """Sets up the round. This includes assigning roles and gathering player names."""
+        # Choose Animal
         herd_animal = random_animal()
+        self.herd_animals.append(herd_animal)
         self.debug_message(f"The secret animal is {herd_animal}.")
 
+        # Assign Roles
         chameleon_index = random_index(len(self.players))
-        chameleon = self.players[chameleon_index]
+        self.chameleon_ids.append(self.players[chameleon_index].id)
 
         for i, player in enumerate(self.players):
             if i == chameleon_index:
@@ -174,25 +194,44 @@ class Game:
                 player.assign_role("herd")
                 self.game_message(format_prompt("assign_herd", herd_animal=herd_animal), player)
 
-        # Phase II: Collect Player Animal Descriptions
+    def run_round(self):
+        """Starts the round."""
+        # Phase I: Collect Player Animal Descriptions
 
         self.game_message(f"Each player will now take turns describing themselves:")
         for i, current_player in enumerate(self.players):
-            if current_player.interface.is_ai:
-                self.verbose_message(f"{current_player.name} is thinking...")
+            self.player_turn_animal_description(current_player)
 
-            prompt = fetch_prompt("player_describe_animal")
+        # Phase II: Chameleon Guesses the Animal
 
-            # Get Player Animal Description
-            message = Message(type="prompt", content=prompt)
-            response = current_player.interface.respond_to_formatted(message, AnimalDescriptionFormat)
+        self.player_turn_chameleon_guess(self.chameleon)
 
-            self.player_responses.append({"sender": current_player.name, "response": response.description})
+        # Phase III: The Herd Votes for who they think the Chameleon is
+        self.game_message("The Chameleon has guessed the animal. Now the Herd will vote on who they think the chameleon is.")
 
-            self.game_message(f"{current_player.name}: {response.description}", current_player, exclude=True)
+        self.herd_vote_tallies.append([])
+        for current_player in self.players:
+            if current_player.role == "herd":
+                self.player_turn_herd_vote(current_player)
 
-        # Phase III: Chameleon Guesses the Animal
 
+
+
+    def player_turn_animal_description(self, player: Player):
+        """Handles a player's turn to describe themselves."""
+        if player.interface.is_ai:
+            self.verbose_message(f"{player.name} is thinking...")
+
+        prompt = fetch_prompt("player_describe_animal")
+
+        # Get Player Animal Description
+        message = Message(type="prompt", content=prompt)
+        response = player.interface.respond_to_formatted(message, AnimalDescriptionFormat)
+
+        self.game_message(f"{player.name}: {response.description}", player, exclude=True)
+
+    def player_turn_chameleon_guess(self, chameleon: Player):
+        """Handles the Chameleon's turn to guess the secret animal."""
         self.game_message("All players have spoken. The Chameleon will now guess the secret animal...")
         if chameleon.interface.is_ai or self.observer:
             self.verbose_message("The Chameleon is thinking...")
@@ -202,75 +241,70 @@ class Game:
         message = Message(type="prompt", content=prompt)
         response = chameleon.interface.respond_to_formatted(message, ChameleonGuessFormat)
 
-        chameleon_animal_guess = response.animal
+        self.chameleon_guesses.append(response.animal)
 
-        # Phase IV: The Herd Votes for who they think the Chameleon is
-        self.game_message("The Chameleon has guessed the animal. Now the Herd will vote on who they think the chameleon is.")
+    def player_turn_herd_vote(self, player: Player):
+        """Handles a player's turn to vote for the Chameleon."""
+        if player.interface.is_ai:
+            self.verbose_message(f"{player.name} is thinking...")
 
-        player_votes = []
-        for player in self.players:
-            if player.role == "herd":
-                if player.interface.is_ai:
-                    self.verbose_message(f"{player.name} is thinking...")
+        prompt = fetch_prompt("vote")
 
-                prompt = format_prompt("vote", player_responses=self.format_responses(exclude=player.name))
+        # Get Player Vote
+        message = Message(type="prompt", content=prompt)
+        other_player_names = [p.name for p in self.players if p != player]
+        response = player.interface.respond_to_formatted(message, HerdVoteFormat, player_names=other_player_names)
 
-                # Get Player Vote
-                message = Message(type="prompt", content=prompt)
-                player_names = [p.name for p in self.players]
-                response = player.interface.respond_to_formatted(message, HerdVoteFormat, player_names=player_names)
+        if player.interface.is_ai:
+            self.debug_message(f"{player.name} voted for {response.vote}")
 
-                # Add Vote to Player Votes
-                player_votes.append({"voter": player, "vote": response.vote})
-                if player.interface.is_ai:
-                    self.debug_message(f"{player.name} voted for {response.vote}")
+        voted_for_player = self.player_from_name(response.vote)
 
+        # Add Vote to Player Votes
+        self.herd_vote_tally.append({"voter": player.id, "voted_for": voted_for_player.id})
+
+    def resolve_round(self):
+        """Resolves the round, assigns points, and prints the results."""
         self.game_message("All players have voted!")
-        formatted_votes = '\n'.join([f'{vote["voter"].name}: {vote["vote"]}' for vote in player_votes])
-        self.game_message(f"Votes:\n{formatted_votes}")
+        for vote in self.herd_vote_tally:
+            voter = self.player_from_id(vote["voter"])
+            voted_for = self.player_from_id(vote["voted_for"])
+            self.game_message(f"{voter.name} voted for {voted_for.name}")
 
-        # Count Votes
-        accused_player = count_chameleon_votes(player_votes)
-
-        # Phase V: Assign Points
+        accused_player_id = count_chameleon_votes(self.herd_vote_tally)
 
         self.game_message(f"The round is over. Calculating results...")
         self.game_message(
-            f"The Chameleon was {chameleon.name}, and they guessed the secret animal was {chameleon_animal_guess}.")
-        self.game_message(f"The secret animal was actually was {herd_animal}.")
+            f"The Chameleon was {self.chameleon.name}, and they guessed the secret animal was {self.chameleon_guess}.")
+        self.game_message(f"The secret animal was actually was {self.herd_animal}.")
 
-        if accused_player:
-            self.game_message(f"The Herd voted for {accused_player} as the Chameleon.")
+        if accused_player_id:
+            accused_name = self.player_from_id(accused_player_id).name
+            self.game_message(f"The Herd voted for {accused_name} as the Chameleon.")
         else:
             self.game_message(f"The Herd could not come to a consensus.")
 
         # Point Logic
         # If the Chameleon guesses the correct animal    =   +1 Point to the Chameleon
-        if chameleon_animal_guess.lower() == herd_animal.lower():
+        if self.chameleon_guess.lower() == self.herd_animal.lower():
+            self.chameleon.points += 1
 
-            chameleon.points += 1
         # If the Chameleon guesses the incorrect animal  =   +1 Point to each Herd player
         else:
             for player in self.players:
                 if player.role == "herd":
                     player.points += 1
         # If a Herd player votes for the Chameleon       =   +1 Point to that player
-        for vote in player_votes:
-            if vote["vote"] == chameleon.name:
-                vote['voter'].points += 1
+        for vote in self.herd_vote_tally:
+            if vote["voted_for"] == self.chameleon.id:
+                self.player_from_id(vote['voter']).points += 1
 
         # If the Herd fails to accuse the Chameleon      =   +1 Point to the Chameleon
-        if not accused_player or accused_player != chameleon.name:
-            chameleon.points += 1
+        if not accused_player_id or accused_player_id != self.chameleon.id:
+            self.chameleon.points += 1
 
-        # Check for a Winner
+        # Print Scores
         player_points = "\n".join([f"{player.name}: {player.points}" for player in self.players])
+        self.game_message(f"Current Game Score:\n{player_points}")
 
-        self.game_message(f"Current Game Score: {player_points}")
 
-        return {
-            "herd_animal": herd_animal,
-            "chameleon_name": chameleon.name,
-            "chameleon_guess": chameleon_animal_guess,
-            "herd_votes": player_votes,
-        }

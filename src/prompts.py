@@ -32,18 +32,12 @@ _player_describe_animal = """It's your turn to describe yourself. Remember:
 
 Your Response:"""
 
-_all_responses = """\
-Below are the responses from all the other players. 
-{player_responses}
-"""
-
 _chameleon_guess_animal = """\
 What animal do you think the other players are pretending to be?
-Guess the name of the animal not it's plural form e.g. guess "animal" not "animals"
 """
 
 _vote_prompt = """\
-Now it is time to vote. Choose from the players above who you think the Chameleon is.
+Now it is time to vote. Choose from the other players who you think the Chameleon is.
 """
 
 prompts = {
@@ -53,5 +47,5 @@ prompts = {
     "player_describe_animal": _player_describe_animal,
     "chameleon_guess_animal": _chameleon_guess_animal,
     "response": "Your response:",
-    "vote": _all_responses + _vote_prompt
+    "vote": _vote_prompt
 }

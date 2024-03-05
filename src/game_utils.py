@@ -37,7 +37,7 @@ def random_index(number_of_players : int) -> int:
 
 def count_chameleon_votes(player_votes: list[dict]) -> str | None:
     """Counts the votes for each player."""
-    votes = [vote['vote'] for vote in player_votes]
+    votes = [vote['voted_for'] for vote in player_votes]
 
     freq = Counter(votes)
     most_voted_player, number_of_votes = freq.most_common()[0]
