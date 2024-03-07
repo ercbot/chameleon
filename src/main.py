@@ -12,7 +12,7 @@ def main():
     else:
         game = Game(verbose=True)
 
-    asyncio.run(game.start())
+    asyncio.run(game.run_game())
 
 
 if __name__ == "__main__":

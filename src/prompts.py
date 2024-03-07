@@ -34,10 +34,16 @@ Your Response:"""
 
 _chameleon_guess_animal = """\
 What animal do you think the other players are pretending to be?
+Player Responses:
+{player_responses}
+Your Guess:
 """
 
 _vote_prompt = """\
 Now it is time to vote. Choose from the other players who you think the Chameleon is.
+Player Responses:
+{player_responses}
+Your Vote:
 """
 
 prompts = {
