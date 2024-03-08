@@ -1,3 +1,12 @@
+```yaml
+title: Chameleon
+emoji: 🦎
+colorFrom: green
+colorTo: yellow
+sdk: streamlit
+sdk_version: 1.31.1
+```
+
 # Chameleon
 
 *A social deduction game powered by LLMs*
