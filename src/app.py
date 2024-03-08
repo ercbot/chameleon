@@ -8,7 +8,7 @@ from agent_interfaces import HumanAgentInterface
 from message import Message
 from prompts import fetch_prompt, format_prompt
 
-st.set_page_config(layout="wide", page_title="Chameleon", page_icon="img/logo.svg")
+st.set_page_config(layout="wide", page_title="Chameleon")
 
 
 def display_message(message: Message):
