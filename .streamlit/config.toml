@@ -1,6 +1,7 @@
 [theme]
 base="dark"
 font="monospace"
+primaryColor="#3dd56d"
 
 [runner]
 magicEnabled=false
