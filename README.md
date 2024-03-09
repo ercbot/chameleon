@@ -1,4 +1,4 @@
----
+<!--
 title: Chameleon
 emoji: 🦎
 colorFrom: green
@@ -7,7 +7,7 @@ sdk: streamlit
 sdk_version: 1.31.1
 app_file: src/app.py
 pinned: true
----
+-->
 
 # Chameleon
 
