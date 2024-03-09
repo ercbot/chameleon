@@ -17,4 +17,4 @@ jobs:
       - name: Push to hub
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: git push https://ericbotti:$HF_TOKEN@huggingface.co/spaces/ericbotti/chameleon space:main
+        run: git push https://ericbotti:$HF_TOKEN@huggingface.co/spaces/ericbotti/chameleon main
