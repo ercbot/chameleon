@@ -1,14 +1,3 @@
----
-title: Chameleon
-emoji: 🦎
-colorFrom: green
-colorTo: yellow
-sdk: streamlit
-sdk_version: 1.31.1
-app_file: src/app.py
-pinned: true
----
-
 # Chameleon
 
 *A social deduction game powered by LLMs*

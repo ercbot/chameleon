@@ -1,4 +1,4 @@
-name: Sync to Hugging Face hub
+name: Deploy to Hugging Face Spaces
 on:
   push:
     branches: [main]
@@ -7,6 +7,13 @@ on:
   workflow_dispatch:
 
 jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Update README
+        run: |
+          python scripts/update_readme.py
   sync-to-hub:
     runs-on: ubuntu-latest
     steps:
@@ -14,6 +21,11 @@ jobs:
         with:
           fetch-depth: 0
           lfs: true
+      - name: Update README
+        run: |
+          python scripts/update_readme.py
+          git add README.md
+          git commit -m "README metadata"
       - name: Push to hub
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
