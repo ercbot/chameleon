@@ -16,7 +16,23 @@ NUMBER_OF_PLAYERS = 6
 WINNING_SCORE = 3
 
 
+# Abstracting the Game Class is a WIP so that future games can be added
 class Game:
+    """Base class for all games."""
+    def __init__(self, verbose: bool = False, debug: bool = False):
+        self.game_id = game_id()
+        """The unique id of the game."""
+        self.start_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        """The time the game was started."""
+        self.verbose = verbose
+        """If True, the game will display verbose messages to the player."""
+        self.debug = debug
+        """If True, the game will display debug messages to the player."""
+        self.winner_id: str | None = None
+        """The id of the player who has won the game."""
+
+
+class ChameleonGame(Game):
     """The main game class, handles the game logic and player interactions."""
 
     winning_score = WINNING_SCORE
@@ -30,15 +46,8 @@ class Game:
             verbose: bool = False,
             debug: bool = False
     ):
+        super().__init__(verbose, debug)
         # Instance Variables
-        self.game_id = game_id()
-        """The unique id of the game."""
-        self.start_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        """The time the game was started."""
-        self.verbose = verbose
-        """If True, the game will display verbose messages to the player."""
-        self.debug = debug
-        """If True, the game will display debug messages to the player."""
         self.chameleon_ids: List[str] = []
         """Record of which player was the chameleon for each round."""
         self.herd_animals: List[str] = []
@@ -49,8 +58,6 @@ class Game:
         """Record of what animal the chameleon guessed for each round."""
         self.herd_vote_tallies: List[List[dict]] = []
         """Record of the votes of each herd member for the chameleon for each round."""
-        self.winner_id: str | None = None
-        """The id of the player who has won the game."""
 
         # Gather Player Names
         if human_name:

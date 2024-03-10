@@ -1,4 +1,4 @@
-from game import Game
+from game import ChameleonGame
 from player import Player
 import asyncio
 from player import Player
@@ -8,9 +8,9 @@ def main():
     name = input()
 
     if name:
-        game = Game(human_name=name, verbose=True)
+        game = ChameleonGame(human_name=name, verbose=True)
     else:
-        game = Game(verbose=True)
+        game = ChameleonGame(verbose=True)
 
     asyncio.run(game.run_game())
 

@@ -3,7 +3,7 @@ from typing import Type
 import streamlit as st
 from streamlit import session_state
 
-from game import Game
+from game import ChameleonGame
 from agent_interfaces import HumanAgentInterface
 from message import Message
 from prompts import fetch_prompt, format_prompt
@@ -36,7 +36,7 @@ class StreamlitInterface(HumanAgentInterface):
         return session_state.user_input
 
 
-class StreamlitGame(Game):
+class StreamlitChameleonGame(ChameleonGame):
     """A Streamlit version of the Game class that uses a state machine to manage the game state."""
 
     def run_game(self):
@@ -141,7 +141,7 @@ with center:
 
 if user_input:
     if "game" not in st.session_state:
-        st.session_state.game = StreamlitGame(human_name=user_input, verbose=True, human_interface=StreamlitInterface)
+        st.session_state.game = StreamlitChameleonGame(human_name=user_input, verbose=True, human_interface=StreamlitInterface)
     session_state.user_input = user_input
     st.session_state.game.run_game()
 
