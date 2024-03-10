@@ -14,7 +14,7 @@ with open(requirements_path, 'r', encoding='utf-16') as requirements:
 # Update README
 readme_path = "README.md"
 
-hf_space_metadata = f"""
+hf_space_metadata = f"""\
 ---
 title: Chameleon
 emoji: 🦎
@@ -31,5 +31,5 @@ pinned: true
 with open(readme_path, 'r') as original_readme:
     data = original_readme.read()
 # Rewrite the README file, with metadata prepended
-with open(readme_path, 'w', encoding="utf-16") as modified_readme:
+with open(readme_path, 'w', encoding="utf-8") as modified_readme:
     modified_readme.write(hf_space_metadata + data)
