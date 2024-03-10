@@ -41,10 +41,10 @@ class StreamlitGame(Game):
 
     def run_game(self):
         """Starts the game."""
+
         if session_state.game_state == "game_start":
             self.game_message(fetch_prompt("game_rules"))
             session_state.game_state = "setup_round"
-
         if session_state.game_state == "setup_round":
             self.setup_round()
             session_state.game_state = "animal_description"
@@ -146,3 +146,17 @@ if user_input:
     st.session_state.game.run_game()
 
 
+footer="""<style>
+.footer {
+position: fixed;
+left: 0;
+bottom: 0;
+width: 100%;
+text-align: center;
+}
+</style>
+<div class="footer">
+<p>Created by <a href="https://huggingface.co/ericbotti" target="_blank">Eric Botti</a></p>
+</div>
+"""
+st.markdown(footer, unsafe_allow_html=True)
