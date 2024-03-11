@@ -149,6 +149,8 @@ if user_input:
 footer="""<style>
 .footer {
 position: fixed;
+background-color: #0E1117;
+padding-top: 10px;
 left: 0;
 bottom: 0;
 width: 100%;
