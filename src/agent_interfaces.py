@@ -21,10 +21,15 @@ class BaseAgentInterface:
 
     def __init__(
             self,
-            agent_id: str = None
+            agent_id: str = None,
+            log_messages: bool = True
     ):
         self.id = agent_id
+        """The id of the agent."""
+        self.log_messages = log_messages
+        """Whether to log messages or not."""
         self.messages = []
+        """The message history of the agent."""
 
     @property
     def is_ai(self):
@@ -33,7 +38,8 @@ class BaseAgentInterface:
     def add_message(self, message: Message):
         """Adds a message to the message history, without generating a response."""
         bound_message = AgentMessage.from_message(message, self.id, len(self.messages))
-        save(bound_message)
+        if self.log_messages:
+            save(bound_message)
         self.messages.append(bound_message)
 
     # Respond To methods - These take a message as input and generate a response
@@ -166,10 +172,6 @@ class HumanAgentInterface(BaseAgentInterface):
 
 class HumanAgentCLI(HumanAgentInterface):
     """A Human agent that uses the command line interface to generate responses."""
-
-    def __init__(self, agent_id: str):
-        super().__init__(agent_id)
-
     def add_message(self, message: Message):
         super().add_message(message)
         if message.type == "verbose":

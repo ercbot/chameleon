@@ -3,7 +3,7 @@ from typing import Type
 import streamlit as st
 from streamlit import session_state
 
-from game import ChameleonGame
+from game_chameleon import ChameleonGame
 from agent_interfaces import HumanAgentInterface
 from message import Message
 from prompts import fetch_prompt, format_prompt
@@ -81,7 +81,7 @@ class StreamlitChameleonGame(ChameleonGame):
             self.game_message("All players have spoken. The Chameleon will now guess the secret animal...")
             player_responses = self.format_animal_descriptions(exclude=self.chameleon)
             self.game_message(format_prompt("chameleon_guess_animal", player_responses=player_responses), self.chameleon)
-            if self.players[self.human_index].role == "chameleon":
+            if self.human_player().role == "chameleon":
                 if not session_state.awaiting_human_input:
                     session_state.awaiting_human_input = True
                 else:
@@ -141,7 +141,7 @@ with center:
 
 if user_input:
     if "game" not in st.session_state:
-        st.session_state.game = StreamlitChameleonGame(human_name=user_input, verbose=True, human_interface=StreamlitInterface)
+        st.session_state.game = StreamlitChameleonGame.from_human_name(user_input, StreamlitInterface)
     session_state.user_input = user_input
     st.session_state.game.run_game()
 

@@ -3,6 +3,7 @@ from pydantic import BaseModel, computed_field
 
 MessageType = Literal["prompt", "info", "agent", "retry", "error", "format", "verbose", "debug"]
 
+
 class Message(BaseModel):
     """A generic message, these are used to communicate between the game and the players."""
 
