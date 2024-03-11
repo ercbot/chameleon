@@ -63,11 +63,15 @@ class BaseAgentInterface:
 
     # Generate response methods - These do not take a message as input and only use the current message history
 
-    def generate_response(self) -> Message:
+    def generate_response(self) -> Message | None:
         """Generates a response based on the current messages in the history."""
-        response = Message(type="agent", content=self._generate())
-        self.add_message(response)
-        return response
+        content = self._generate()
+        if content:
+            response = Message(type="agent", content=content)
+            self.add_message(response)
+            return response
+        else:
+            return None
 
     def generate_formatted_response(
             self,
@@ -158,14 +162,18 @@ class HumanAgentInterface(BaseAgentInterface):
             output_format: Type[OutputFormatModel],
             additional_fields: dict = None,
             max_retries: int = 3
-    ) -> OutputFormatModel:
+    ) -> OutputFormatModel | None:
         """For Human agents, we can trust them enough to format their own responses... for now"""
         response = self.generate_response()
-        # only works because current outputs have only 1 field...
-        fields = {output_format.model_fields.copy().popitem()[0]: response.content}
-        if additional_fields:
-            fields.update(additional_fields)
-        output = output_format.model_validate(fields)
+
+        if response:
+            # only works because current outputs have only 1 field...
+            fields = {output_format.model_fields.copy().popitem()[0]: response.content}
+            if additional_fields:
+                fields.update(additional_fields)
+            output = output_format.model_validate(fields)
+        else:
+            output = None
 
         return output
 

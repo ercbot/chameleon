@@ -152,45 +152,67 @@ class ChameleonGame(Game):
 
     def player_turn_animal_description(self, player: Player):
         """Handles a player's turn to describe themselves."""
-        if player.interface.is_ai:
-            self.verbose_message(f"{player.name} is thinking...")
-
-        prompt = fetch_prompt("player_describe_animal")
+        if not self.awaiting_input:
+            self.verbose_message(f"{player.name} is thinking...", recipient=player, exclude=True)
+            self.game_message(fetch_prompt("player_describe_animal"), player)
 
         # Get Player Animal Description
         response = player.interface.generate_formatted_response(AnimalDescriptionFormat)
 
-        self.round_animal_descriptions.append({"player_id": player.id, "description": response.description})
+        if response:
+            self.round_animal_descriptions.append({"player_id": player.id, "description": response.description})
+            self.game_message(f"{player.name}: {response.description}", player, exclude=True)
+            self.awaiting_input = False
+        else:
+            self.awaiting_input = True
 
-        self.game_message(f"{player.name}: {response.description}", player, exclude=True)
+        return response
 
     def player_turn_chameleon_guess(self, chameleon: Player):
         """Handles the Chameleon's turn to guess the secret animal."""
-
-        if chameleon.interface.is_ai or self.observer:
-            self.verbose_message("The Chameleon is thinking...")
+        if not self.awaiting_input:
+            self.game_message("All players have spoken. The Chameleon will now guess the secret animal...")
+            self.verbose_message("The Chameleon is thinking...", recipient=chameleon, exclude=True)
+            player_responses = self.format_animal_descriptions(exclude=self.chameleon)
+            self.game_message(format_prompt("chameleon_guess_animal", player_responses=player_responses),
+                              self.chameleon)
 
         response = chameleon.interface.generate_formatted_response(ChameleonGuessFormat)
 
-        self.game_message("The Chameleon has guessed the animal. Now the Herd will vote on who they think the chameleon is.")
-
-        self.chameleon_guesses.append(response.animal)
+        if response:
+            self.chameleon_guesses.append(response.animal)
+            self.game_message(
+                "The Chameleon has guessed the animal. Now the Herd will vote on who they think the chameleon is.")
+            self.awaiting_input = False
+            self.game_state = "herd_vote"
+        else:
+            # Await input and do not proceed to the next phase
+            self.awaiting_input = True
 
     def player_turn_herd_vote(self, player: Player):
         """Handles a player's turn to vote for the Chameleon."""
-        if player.interface.is_ai:
-            self.verbose_message(f"{player.name} is thinking...")
+        if not self.awaiting_input:
+            self.verbose_message(f"{player.name} is thinking...", recipient=player, exclude=True)
+            player_responses = self.format_animal_descriptions(exclude=player)
+            self.game_message(format_prompt("vote", player_responses=player_responses), player)
 
         # Get Player Vote
         additional_fields = {"player_names": [p.name for p in self.players if p != player]}
         response = player.interface.generate_formatted_response(HerdVoteFormat, additional_fields=additional_fields)
 
-        self.debug_message(f"{player.name} voted for {response.vote}", recipient=player, exclude=True)
+        if response:
+            self.debug_message(f"{player.name} voted for {response.vote}", recipient=player, exclude=True)
 
-        voted_for_player = self.player_from_name(response.vote)
+            voted_for_player = self.player_from_name(response.vote)
 
-        # Add Vote to Player Votes
-        self.herd_vote_tally.append({"voter_id": player.id, "voted_for_id": voted_for_player.id})
+            player_vote = {"voter_id": player.id, "voted_for_id": voted_for_player.id}
+
+            self.herd_vote_tally.append(player_vote)
+            self.awaiting_input = False
+        else:
+            self.awaiting_input = True
+
+        return response
 
     def resolve_round(self):
         """Resolves the round, assigns points, and prints the results."""

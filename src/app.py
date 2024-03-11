@@ -22,8 +22,7 @@ def display_message(message: Message):
 
 if "messages" not in session_state:
     session_state.messages = []
-    session_state.awaiting_human_input = False
-    session_state.game_state = "game_start"
+    session_state.user_input = None
 
 
 class StreamlitInterface(HumanAgentInterface):
@@ -33,7 +32,9 @@ class StreamlitInterface(HumanAgentInterface):
         display_message(message)
 
     def _generate(self) -> str:
-        return session_state.user_input
+        response = session_state.user_input
+        session_state.user_input = None
+        return response
 
 
 class StreamlitChameleonGame(ChameleonGame):
@@ -42,76 +43,50 @@ class StreamlitChameleonGame(ChameleonGame):
     def run_game(self):
         """Starts the game."""
 
-        if session_state.game_state == "game_start":
+        if self.game_state == "game_start":
             self.game_message(fetch_prompt("game_rules"))
-            session_state.game_state = "setup_round"
-        if session_state.game_state == "setup_round":
+            self.game_state = "setup_round"
+        if self.game_state == "setup_round":
             self.setup_round()
-            session_state.game_state = "animal_description"
-        if session_state.game_state in ["animal_description", "chameleon_guess", "herd_vote"]:
+            self.game_state = "animal_description"
+        if self.game_state in ["animal_description", "chameleon_guess", "herd_vote"]:
             self.run_round()
-        if session_state.game_state == "resolve_round":
+        if self.game_state == "resolve_round":
             self.resolve_round()
-            session_state.game_state = "setup_round"
+            self.game_state = "setup_round"
 
     def run_round(self):
         """Starts the round."""
 
         # Phase I: Collect Player Animal Descriptions
-        if session_state.game_state == "animal_description":
+        if self.game_state == "animal_description":
             for current_player in self.players:
                 if current_player.id not in [animal_description['player_id'] for animal_description in self.round_animal_descriptions]:
-                    if current_player.interface.is_human:
-                        if not session_state.awaiting_human_input:
-                            self.game_message(fetch_prompt("player_describe_animal"), current_player)
-                            session_state.awaiting_human_input = True
-                            break
-                        else:
-                            self.player_turn_animal_description(current_player)
-                            session_state.awaiting_human_input = False
-                    else:
-                        self.game_message(fetch_prompt("player_describe_animal"), current_player)
-                        self.player_turn_animal_description(current_player)
+
+                    response = self.player_turn_animal_description(current_player)
+
+                    if not response:
+                        break
+
             if len(self.round_animal_descriptions) == len(self.players):
-                session_state.game_state = "chameleon_guess"
-                session_state.awaiting_human_input = False
+                self.game_state = "chameleon_guess"
 
         # Phase II: Chameleon Guesses the Animal
-        if session_state.game_state == "chameleon_guess":
-            self.game_message("All players have spoken. The Chameleon will now guess the secret animal...")
-            player_responses = self.format_animal_descriptions(exclude=self.chameleon)
-            self.game_message(format_prompt("chameleon_guess_animal", player_responses=player_responses), self.chameleon)
-            if self.human_player().role == "chameleon":
-                if not session_state.awaiting_human_input:
-                    session_state.awaiting_human_input = True
-                else:
-                    self.player_turn_chameleon_guess(self.chameleon)
-                    session_state.awaiting_human_input = False
-            else:
-                self.player_turn_chameleon_guess(self.chameleon)
-                session_state.awaiting_human_input = False
-
-            session_state.game_state = "herd_vote"
+        if self.game_state == "chameleon_guess":
+            self.player_turn_chameleon_guess(self.chameleon)
 
         # Phase III: The Herd Votes for who they think the Chameleon is
-        if session_state.game_state == "herd_vote":
+        if self.game_state == "herd_vote":
             for current_player in self.players:
                 if current_player.role == "herd" and current_player.id not in [vote['voter_id'] for vote in self.herd_vote_tally]:
-                    player_responses = self.format_animal_descriptions(exclude=current_player)
-                    if current_player.interface.is_human:
-                        if not session_state.awaiting_human_input:
-                            self.game_message(format_prompt("vote", player_responses=player_responses), current_player)
-                            session_state.awaiting_human_input = True
-                            break
-                        else:
-                            self.player_turn_herd_vote(current_player)
-                            session_state.awaiting_human_input = False
-                    else:
-                        self.game_message(format_prompt("vote", player_responses=player_responses), current_player)
-                        self.player_turn_herd_vote(current_player)
+
+                    response = self.player_turn_herd_vote(current_player)
+
+                    if not response:
+                        break
 
             if len(self.herd_vote_tally) == len(self.players) - 1:
-                session_state.game_state = "resolve_round"
+                self.game_state = "resolve_round"
 
 
 # Streamlit App
@@ -142,7 +117,9 @@ with center:
 if user_input:
     if "game" not in st.session_state:
         st.session_state.game = StreamlitChameleonGame.from_human_name(user_input, StreamlitInterface)
-    session_state.user_input = user_input
+    else:
+        session_state.user_input = user_input
+
     st.session_state.game.run_game()
 
 st.markdown("#")

@@ -28,6 +28,9 @@ class Game:
 
         self.winner_id: str | None = None
         """The id of the player who has won the game."""
+        self.game_state: str = "game_start"
+        """Keeps track of the current state of the game."""
+        self.awaiting_input: bool = False
 
     def player_from_id(self, player_id: str) -> Player:
         """Returns a player from their ID."""
