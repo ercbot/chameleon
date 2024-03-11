@@ -145,6 +145,7 @@ if user_input:
     session_state.user_input = user_input
     st.session_state.game.run_game()
 
+st.markdown("#")
 
 footer="""<style>
 .footer {
