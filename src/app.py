@@ -43,17 +43,31 @@ class StreamlitChameleonGame(ChameleonGame):
     def run_game(self):
         """Starts the game."""
 
-        if self.game_state == "game_start":
-            self.game_message(fetch_prompt("game_rules"))
-            self.game_state = "setup_round"
-        if self.game_state == "setup_round":
-            self.setup_round()
-            self.game_state = "animal_description"
-        if self.game_state in ["animal_description", "chameleon_guess", "herd_vote"]:
-            self.run_round()
-        if self.game_state == "resolve_round":
-            self.resolve_round()
-            self.game_state = "setup_round"
+        # Check if the game has not been won
+        if self.game_state != "game_end":
+            if self.game_state == "game_start":
+                self.game_message(fetch_prompt("game_rules"))
+                self.game_state = "setup_round"
+            if self.game_state == "setup_round":
+                self.setup_round()
+                self.game_state = "animal_description"
+            if self.game_state in ["animal_description", "chameleon_guess", "herd_vote"]:
+                self.run_round()
+            if self.game_state == "resolve_round":
+                self.resolve_round()
+
+                points = [player.points for player in self.players]
+
+                if max(points) >= self.winning_score:
+                    self.game_state = "game_end"
+                    self.winner_id = self.players[points.index(max(points))].id
+                else:
+                    self.game_state = "setup_round"
+                    self.run_game()
+
+        if self.game_state == "game_end":
+            self.game_message(f"The game is over {self.winner_id} has won!")
+
 
     def run_round(self):
         """Starts the round."""
