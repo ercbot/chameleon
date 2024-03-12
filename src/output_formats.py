@@ -28,12 +28,12 @@ class AnimalDescriptionFormat(OutputFormatModel):
     description: str = Field(description="A brief description of the animal")
     """A brief description of the animal"""
 
-    # @field_validator('description')
-    # @classmethod
-    # def check_starting_character(cls, v) -> str:
-    #     if not v[0].upper() == 'I':
-    #         raise ValueError("Description must begin with 'I'")
-    #     return v
+    @field_validator('description')
+    @classmethod
+    def check_starting_character(cls, v) -> str:
+        if not v[0].upper() == 'I':
+            raise ValueError("Please rewrite your description so that it begins with 'I'")
+        return v
 
 
 class ChameleonGuessFormat(OutputFormatModel):
