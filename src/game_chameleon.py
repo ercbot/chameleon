@@ -1,17 +1,15 @@
-from typing import Optional, Type
+from collections import Counter
 
 from game_utils import random_index
-from game_utils_chameleon import *
 from output_formats import *
 from player import ChameleonPlayer, Player
 from prompts import fetch_prompt, format_prompt
-from message import Message, MessageType
-from agent_interfaces import HumanAgentCLI, OpenAIAgentInterface, HumanAgentInterface
+
 from game import Game
 
 # Default Values
 NUMBER_OF_PLAYERS = 6
-WINNING_SCORE = 3
+WINNING_SCORE = 6
 
 
 class ChameleonGame(Game):
@@ -21,6 +19,8 @@ class ChameleonGame(Game):
 
     winning_score = WINNING_SCORE
     """The Number of points required to win the game."""
+    available_animals = ["Dog", "Cat", "Mouse", "Hamster", "Monkey", "Rabbit", "Fox", "Bear", "Panda", "Koala", "Tiger", "Lion", "Cow", "Pig", "Frog", "Owl", "Duck", "Chicken", "Butterfly", "Turtle", "Snake", "Octopus", "Squid", "Hedgehog", "Elephant", "Rhinoceros", "Zebra", "Crocodile", "Whale", "Dolphin", "Camel", "Giraffe", "Deer", "Gorilla", "Goat", "Llama", "Horse", "Unicorn", "Flamingo", "Skunk", "Shark"]
+    """The list of animals that can be chosen as the secret animal."""
 
     def __init__(self, *args, **kwargs):
 
@@ -42,7 +42,7 @@ class ChameleonGame(Game):
         """Record of the votes of each herd member for the chameleon for each round."""
 
     @property
-    def chameleon(self) -> Player:
+    def chameleon(self) -> ChameleonPlayer:
         """Returns the current chameleon."""
         return self.player_from_id(self.chameleon_ids[-1])
 
@@ -71,17 +71,6 @@ class ChameleonGame(Game):
         """Returns the current round number."""
         return len(self.herd_animals)
 
-    def format_animal_descriptions(self, exclude: Player = None) -> str:
-        """Formats the animal description responses of the players into a single string."""
-        formatted_responses = ""
-        for response in self.round_animal_descriptions:
-            # Used to exclude the player who is currently responding, so they don't vote for themselves like a fool
-            if response["player_id"] != exclude.id:
-                player = self.player_from_id(response["player_id"])
-                formatted_responses += f" - {player.name}: {response['description']}\n"
-
-        return formatted_responses
-
     def run_game(self):
         """Starts the game."""
 
@@ -103,6 +92,9 @@ class ChameleonGame(Game):
                 if max(points) >= self.winning_score:
                     self.game_state = "game_end"
                     self.winner_id = self.players[points.index(max(points))].id
+                    winner = self.player_from_id(self.winner_id)
+                    self.game_message(f"The game is over {winner.name} has won!")
+
                 else:
                     self.game_state = "setup_round"
                     # Go back to start
@@ -110,9 +102,6 @@ class ChameleonGame(Game):
                     self.game_message(f"Starting a new round...")
                     random.shuffle(self.players)
                     self.run_game()
-
-        if self.game_state == "game_end":
-            self.game_message(f"The game is over {self.winner_id} has won!")
 
     def run_round(self):
         """Starts the round."""
@@ -152,7 +141,7 @@ class ChameleonGame(Game):
     def setup_round(self):
         """Sets up the round. This includes assigning roles and gathering player names."""
         # Choose Animal
-        herd_animal = random_animal()
+        herd_animal = self.random_animal()
         self.herd_animals.append(herd_animal)
         self.debug_message(f"The secret animal is {herd_animal}.")
 
@@ -249,7 +238,7 @@ class ChameleonGame(Game):
             voted_for = self.player_from_id(vote["voted_for_id"])
             self.game_message(f"{voter.name} voted for {voted_for.name}")
 
-        accused_player_id = count_chameleon_votes(self.herd_vote_tally)
+        accused_player_id = self.count_chameleon_votes(self.herd_vote_tally)
 
         self.game_message(f"The round is over. Calculating results...")
         self.game_message(
@@ -284,3 +273,34 @@ class ChameleonGame(Game):
         # Print Scores
         player_points = "\n".join([f"{player.name}: {player.points}" for player in self.players])
         self.game_message(f"Current Game Score:\n{player_points}")
+
+    def random_animal(self) -> str:
+        """Returns a random animal from the list of available animals, and removes it from the list."""
+        animal = random.choice(self.available_animals)
+        self.available_animals.remove(animal)
+        return animal
+
+    @staticmethod
+    def count_chameleon_votes(player_votes: list[dict]) -> str | None:
+        """Counts the votes for each player."""
+        votes = [vote['voted_for_id'] for vote in player_votes]
+
+        freq = Counter(votes)
+        most_voted_player, number_of_votes = freq.most_common()[0]
+
+        # If one player has more than 50% of the votes, the herd accuses them of being the chameleon
+        if number_of_votes / len(player_votes) >= 0.5:
+            return most_voted_player
+        else:
+            return None
+
+    def format_animal_descriptions(self, exclude: Player = None) -> str:
+        """Formats the animal description responses of the players into a single string."""
+        formatted_responses = ""
+        for response in self.round_animal_descriptions:
+            # Used to exclude the player who is currently responding, so they don't vote for themselves like a fool
+            if response["player_id"] != exclude.id:
+                player = self.player_from_id(response["player_id"])
+                formatted_responses += f" - {player.name}: {response['description']}\n"
+
+        return formatted_responses
