@@ -66,11 +66,6 @@ class ChameleonGame(Game):
         """Returns the current herd vote tally."""
         return self.herd_vote_tallies[-1]
 
-    @property
-    def round_number(self) -> int:
-        """Returns the current round number."""
-        return len(self.herd_animals)
-
     def run_game(self):
         """Starts the game."""
 
@@ -91,9 +86,10 @@ class ChameleonGame(Game):
 
                 if max(points) >= self.winning_score:
                     self.game_state = "game_end"
-                    self.winner_id = self.players[points.index(max(points))].id
+                    self.winner_id = self.players[points.index(max(points))].player_id
                     winner = self.player_from_id(self.winner_id)
                     self.game_message(f"The game is over {winner.name} has won!")
+                    self.end_game()
 
                 else:
                     self.game_state = "setup_round"
@@ -109,8 +105,8 @@ class ChameleonGame(Game):
         # Phase I: Collect Player Animal Descriptions
         if self.game_state == "animal_description":
             for current_player in self.players:
-                if current_player.id not in [animal_description['player_id'] for animal_description in
-                                             self.round_animal_descriptions]:
+                if current_player.player_id not in [animal_description['player_id'] for animal_description in
+                                                    self.round_animal_descriptions]:
 
                     response = self.player_turn_animal_description(current_player)
 
@@ -127,8 +123,8 @@ class ChameleonGame(Game):
         # Phase III: The Herd Votes for who they think the Chameleon is
         if self.game_state == "herd_vote":
             for current_player in self.players:
-                if current_player.role == "herd" and current_player.id not in [vote['voter_id'] for vote in
-                                                                               self.herd_vote_tally]:
+                if current_player.role == "herd" and current_player.player_id not in [vote['voter_id'] for vote in
+                                                                                      self.herd_vote_tally]:
 
                     response = self.player_turn_herd_vote(current_player)
 
@@ -147,7 +143,7 @@ class ChameleonGame(Game):
 
         # Assign Roles
         chameleon_index = random_index(len(self.players))
-        self.chameleon_ids.append(self.players[chameleon_index].id)
+        self.chameleon_ids.append(self.players[chameleon_index].player_id)
 
         for i, player in enumerate(self.players):
             if i == chameleon_index:
@@ -176,7 +172,7 @@ class ChameleonGame(Game):
         response = player.interface.generate_formatted_response(AnimalDescriptionFormat)
 
         if response:
-            self.round_animal_descriptions.append({"player_id": player.id, "description": response.description})
+            self.round_animal_descriptions.append({"player_id": player.player_id, "description": response.description})
             self.game_message(f"{player.name}: {response.description}", player, exclude=True)
             self.awaiting_input = False
         else:
@@ -221,7 +217,7 @@ class ChameleonGame(Game):
 
             voted_for_player = self.player_from_name(response.vote)
 
-            player_vote = {"voter_id": player.id, "voted_for_id": voted_for_player.id}
+            player_vote = {"voter_id": player.player_id, "voted_for_id": voted_for_player.player_id}
 
             self.herd_vote_tally.append(player_vote)
             self.awaiting_input = False
@@ -263,11 +259,11 @@ class ChameleonGame(Game):
                     player.points += 1
         # If a Herd player votes for the Chameleon       =   +1 Point to that player
         for vote in self.herd_vote_tally:
-            if vote["voted_for_id"] == self.chameleon.id:
+            if vote["voted_for_id"] == self.chameleon.player_id:
                 self.player_from_id(vote['voter_id']).points += 1
 
         # If the Herd fails to accuse the Chameleon      =   +1 Point to the Chameleon
-        if not accused_player_id or accused_player_id != self.chameleon.id:
+        if not accused_player_id or accused_player_id != self.chameleon.player_id:
             self.chameleon.points += 1
 
         # Print Scores
@@ -299,7 +295,7 @@ class ChameleonGame(Game):
         formatted_responses = ""
         for response in self.round_animal_descriptions:
             # Used to exclude the player who is currently responding, so they don't vote for themselves like a fool
-            if response["player_id"] != exclude.id:
+            if response["player_id"] != exclude.player_id:
                 player = self.player_from_id(response["player_id"])
                 formatted_responses += f" - {player.name}: {response['description']}\n"
 

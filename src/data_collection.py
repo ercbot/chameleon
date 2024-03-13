@@ -26,11 +26,11 @@ def save(log_object: Model):
 
 
 def get_log_file(log_object: Model) -> str:
-    match type(log_object):
-        case message.AgentMessage:
-            log_file = "messages.jsonl"
-        # ...
-        case _:
-            raise ValueError(f"Unknown log object type: {type(log_object)}")
+    if isinstance(log_object, message.AgentMessage):
+        log_file = "messages.jsonl"
+    elif isinstance(log_object, player.Player):
+        log_file = "players.jsonl"
+    else:
+        raise ValueError(f"Unknown log object type: {type(log_object)}")
 
     return os.path.join(data_dir, log_file)

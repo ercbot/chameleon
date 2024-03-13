@@ -4,7 +4,7 @@ from game_utils import *
 from player import Player
 from message import Message, MessageType
 from agent_interfaces import HumanAgentCLI, OpenAIAgentInterface, HumanAgentInterface
-
+from data_collection import save
 
 # Abstracting the Game Class is a WIP so that future games can be added
 class Game:
@@ -34,15 +34,11 @@ class Game:
 
     def player_from_id(self, player_id: str) -> Player:
         """Returns a player from their ID."""
-        return next((player for player in self.players if player.id == player_id), None)
+        return next((player for player in self.players if player.player_id == player_id), None)
 
     def player_from_name(self, name: str) -> Player:
         """Returns a player from their name."""
         return next((player for player in self.players if player.name == name), None)
-
-    def human_player(self) -> Player:
-        """Returns the human player."""
-        return next((player for player in self.players if player.interface.is_human), None)
 
     def game_message(
             self,
@@ -88,6 +84,11 @@ class Game:
         """Runs the game."""
         raise NotImplementedError("The run_game method must be implemented by the subclass.")
 
+    def end_game(self):
+        """Ends the game and declares a winner."""
+        for player in self.players:
+            save(player)
+
     @classmethod
     def from_human_name(
             cls, human_name: str = None,
@@ -113,18 +114,19 @@ class Game:
 
         for i in range(0, cls.number_of_players):
             player_id = f"{game_id}-{i + 1}"
+            player_dict = {"game_id": game_id, "player_id": player_id}
 
             if human_index == i:
-                name = human_name
-                interface = human_interface(player_id)
-                message_level = human_message_level
+                player_dict["name"] = human_name
+                player_dict["interface"] = human_interface(agent_id=player_id)
+                player_dict["message_level"] = human_message_level
             else:
-                name = ai_names.pop()
+                player_dict["name"] = ai_names.pop()
                 # all AI players use the OpenAI interface for now - this can be changed in the future
-                interface = OpenAIAgentInterface(player_id)
-                message_level = "info"
+                player_dict["interface"] = OpenAIAgentInterface(agent_id=player_id)
+                player_dict["message_level"] = "info"
 
-            players.append(Player(name, player_id, interface, message_level))
+            players.append(Player(**player_dict))
 
         # Add Observer - an Agent who can see all the messages, but doesn't actually play
         if human_index is None:

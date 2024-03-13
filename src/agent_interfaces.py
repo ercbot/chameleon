@@ -1,35 +1,30 @@
 from json import JSONDecodeError
-from typing import Type, NewType
+from typing import Type, NewType, List, Any
 import json
 
 from openai import OpenAI
 from colorama import Fore, Style
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, Field, ConfigDict
 
 from output_formats import OutputFormatModel
 from message import Message, AgentMessage
 from data_collection import save
 
 
-class BaseAgentInterface:
+class BaseAgentInterface(BaseModel):
     """
     The interface that agents use to receive info from and interact with the game.
     This is the base class and should not be used directly.
     """
 
+    agent_id: str
+    """The id of the agent."""
+    log_messages: bool = True
+    """Whether to log messages or not."""
+    messages: List[Message] = []
+    """The message history of the agent."""
     is_human: bool = False
-
-    def __init__(
-            self,
-            agent_id: str = None,
-            log_messages: bool = True
-    ):
-        self.id = agent_id
-        """The id of the agent."""
-        self.log_messages = log_messages
-        """Whether to log messages or not."""
-        self.messages = []
-        """The message history of the agent."""
+    """Whether the agent is human or not."""
 
     @property
     def is_ai(self):
@@ -37,7 +32,7 @@ class BaseAgentInterface:
 
     def add_message(self, message: Message):
         """Adds a message to the message history, without generating a response."""
-        bound_message = AgentMessage.from_message(message, self.id, len(self.messages))
+        bound_message = AgentMessage.from_message(message, self.agent_id, len(self.messages))
         if self.log_messages:
             save(bound_message)
         self.messages.append(bound_message)
@@ -129,16 +124,14 @@ class BaseAgentInterface:
         raise NotImplementedError
 
 
-AgentInterface = NewType("AgentInterface", BaseAgentInterface)
-
-
 class OpenAIAgentInterface(BaseAgentInterface):
     """An interface that uses the OpenAI API (or compatible 3rd parties) to generate responses."""
+    model_config = ConfigDict(protected_namespaces=())
 
-    def __init__(self, agent_id: str, model_name: str = "gpt-3.5-turbo"):
-        super().__init__(agent_id)
-        self.model_name = model_name
-        self.client = OpenAI()
+    model_name: str ="gpt-3.5-turbo"
+    """The name of the model to use for generating responses."""
+    client: Any = Field(default_factory=OpenAI, exclude=True)
+    """The OpenAI client used to generate responses."""
 
     def _generate(self) -> str:
         """Generates a response using the message history"""
@@ -153,7 +146,7 @@ class OpenAIAgentInterface(BaseAgentInterface):
 
 
 class HumanAgentInterface(BaseAgentInterface):
-    is_human = True
+    is_human: bool = Field(default=True, frozen=True)
 
     def generate_formatted_response(
             self,
