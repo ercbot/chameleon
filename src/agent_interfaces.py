@@ -122,8 +122,6 @@ class BaseAgentInterface:
 
         return output
 
-    # How agents actually generate responses
-
     def _generate(self) -> str:
         """Generates a response from the Agent."""
         # This is the BaseAgent class, and thus has no response logic
@@ -168,10 +166,17 @@ class HumanAgentInterface(BaseAgentInterface):
 
         if response:
             # only works because current outputs have only 1 field...
-            fields = {output_format.model_fields.copy().popitem()[0]: response.content}
-            if additional_fields:
-                fields.update(additional_fields)
-            output = output_format.model_validate(fields)
+            try:
+                fields = {output_format.model_fields.copy().popitem()[0]: response.content}
+                if additional_fields:
+                    fields.update(additional_fields)
+                output = output_format.model_validate(fields)
+
+            except ValidationError as e:
+                retry_message = Message(type="retry", content=f"Error formatting response: {e} \n\n Please try again.")
+                self.add_message(retry_message)
+                output = None
+
         else:
             output = None
 
