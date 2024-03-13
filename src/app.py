@@ -37,72 +37,6 @@ class StreamlitInterface(HumanAgentInterface):
         return response
 
 
-class StreamlitChameleonGame(ChameleonGame):
-    """A Streamlit version of the Game class that uses a state machine to manage the game state."""
-
-    def run_game(self):
-        """Starts the game."""
-
-        # Check if the game has not been won
-        if self.game_state != "game_end":
-            if self.game_state == "game_start":
-                self.game_message(fetch_prompt("game_rules"))
-                self.game_state = "setup_round"
-            if self.game_state == "setup_round":
-                self.setup_round()
-                self.game_state = "animal_description"
-            if self.game_state in ["animal_description", "chameleon_guess", "herd_vote"]:
-                self.run_round()
-            if self.game_state == "resolve_round":
-                self.resolve_round()
-
-                points = [player.points for player in self.players]
-
-                if max(points) >= self.winning_score:
-                    self.game_state = "game_end"
-                    self.winner_id = self.players[points.index(max(points))].id
-                else:
-                    self.game_state = "setup_round"
-                    self.run_game()
-
-        if self.game_state == "game_end":
-            self.game_message(f"The game is over {self.winner_id} has won!")
-
-
-    def run_round(self):
-        """Starts the round."""
-
-        # Phase I: Collect Player Animal Descriptions
-        if self.game_state == "animal_description":
-            for current_player in self.players:
-                if current_player.id not in [animal_description['player_id'] for animal_description in self.round_animal_descriptions]:
-
-                    response = self.player_turn_animal_description(current_player)
-
-                    if not response:
-                        break
-
-            if len(self.round_animal_descriptions) == len(self.players):
-                self.game_state = "chameleon_guess"
-
-        # Phase II: Chameleon Guesses the Animal
-        if self.game_state == "chameleon_guess":
-            self.player_turn_chameleon_guess(self.chameleon)
-
-        # Phase III: The Herd Votes for who they think the Chameleon is
-        if self.game_state == "herd_vote":
-            for current_player in self.players:
-                if current_player.role == "herd" and current_player.id not in [vote['voter_id'] for vote in self.herd_vote_tally]:
-
-                    response = self.player_turn_herd_vote(current_player)
-
-                    if not response:
-                        break
-
-            if len(self.herd_vote_tally) == len(self.players) - 1:
-                self.game_state = "resolve_round"
-
-
 # Streamlit App
 
 margin_size = 1
@@ -130,7 +64,7 @@ with center:
 
 if user_input:
     if "game" not in st.session_state:
-        st.session_state.game = StreamlitChameleonGame.from_human_name(user_input, StreamlitInterface)
+        st.session_state.game = ChameleonGame.from_human_name(user_input, StreamlitInterface)
     else:
         session_state.user_input = user_input
 

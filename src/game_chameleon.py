@@ -41,10 +41,8 @@ class ChameleonGame(Game):
         self.herd_vote_tallies: List[List[dict]] = []
         """Record of the votes of each herd member for the chameleon for each round."""
 
-
-
     @property
-    def chameleon(self) -> ChameleonPlayer:
+    def chameleon(self) -> Player:
         """Returns the current chameleon."""
         return self.player_from_id(self.chameleon_ids[-1])
 
@@ -84,23 +82,72 @@ class ChameleonGame(Game):
 
         return formatted_responses
 
-    async def run_game(self):
-        """Sets up the game. This includes assigning roles and gathering player names."""
-        self.game_message(fetch_prompt("game_rules"))
+    def run_game(self):
+        """Starts the game."""
 
-        self.setup_round()
+        # Check if the game has not been won
+        if self.game_state != "game_end":
+            if self.game_state == "game_start":
+                self.game_message(fetch_prompt("game_rules"))
+                self.game_state = "setup_round"
+            if self.game_state == "setup_round":
+                self.setup_round()
+                self.game_state = "animal_description"
+            if self.game_state in ["animal_description", "chameleon_guess", "herd_vote"]:
+                self.run_round()
+            if self.game_state == "resolve_round":
+                self.resolve_round()
 
-        self.run_round()
+                points = [player.points for player in self.players]
 
-        self.resolve_round()
+                if max(points) >= self.winning_score:
+                    self.game_state = "game_end"
+                    self.winner_id = self.players[points.index(max(points))].id
+                else:
+                    self.game_state = "setup_round"
+                    # Go back to start
+                    self.game_message(f"No player has won yet, the game will end when a player reaches {self.winning_score} points.")
+                    self.game_message(f"Starting a new round...")
+                    random.shuffle(self.players)
+                    self.run_game()
 
-        # # Log Game Info
-        # game_log = {
-        #     "game_id": self.game_id,
-        #     "start_time": self.start_time,
-        #     "number_of_players": len(self.players),
-        #     "human_player": self.players[self.human_index].id if self.human_index else "None",
-        # }
+        if self.game_state == "game_end":
+            self.game_message(f"The game is over {self.winner_id} has won!")
+
+    def run_round(self):
+        """Starts the round."""
+
+        # Phase I: Collect Player Animal Descriptions
+        if self.game_state == "animal_description":
+            for current_player in self.players:
+                if current_player.id not in [animal_description['player_id'] for animal_description in
+                                             self.round_animal_descriptions]:
+
+                    response = self.player_turn_animal_description(current_player)
+
+                    if not response:
+                        break
+
+            if len(self.round_animal_descriptions) == len(self.players):
+                self.game_state = "chameleon_guess"
+
+        # Phase II: Chameleon Guesses the Animal
+        if self.game_state == "chameleon_guess":
+            self.player_turn_chameleon_guess(self.chameleon)
+
+        # Phase III: The Herd Votes for who they think the Chameleon is
+        if self.game_state == "herd_vote":
+            for current_player in self.players:
+                if current_player.role == "herd" and current_player.id not in [vote['voter_id'] for vote in
+                                                                               self.herd_vote_tally]:
+
+                    response = self.player_turn_herd_vote(current_player)
+
+                    if not response:
+                        break
+
+            if len(self.herd_vote_tally) == len(self.players) - 1:
+                self.game_state = "resolve_round"
 
     def setup_round(self):
         """Sets up the round. This includes assigning roles and gathering player names."""
@@ -129,26 +176,6 @@ class ChameleonGame(Game):
         self.herd_vote_tallies.append([])
 
         self.game_message(f"Each player will now take turns describing themselves:")
-
-    def run_round(self):
-        """Starts the round."""
-        # Phase I: Collect Player Animal Descriptions
-        for current_player in self.players:
-            self.game_message(fetch_prompt("player_describe_animal"), current_player)
-            self.player_turn_animal_description(current_player)
-
-        # Phase II: Chameleon Guesses the Animal
-        self.game_message("All players have spoken. The Chameleon will now guess the secret animal...")
-        player_responses = self.format_animal_descriptions(exclude=self.chameleon)
-        self.game_message(format_prompt("chameleon_guess_animal", player_responses=player_responses), self.chameleon)
-        self.player_turn_chameleon_guess(self.chameleon)
-
-        # Phase III: The Herd Votes for who they think the Chameleon is
-        for current_player in self.players:
-            if current_player.role == "herd":
-                player_responses = self.format_animal_descriptions(exclude=current_player)
-                self.game_message(format_prompt("vote", player_responses=player_responses), current_player)
-                self.player_turn_herd_vote(current_player)
 
     def player_turn_animal_description(self, player: Player):
         """Handles a player's turn to describe themselves."""
