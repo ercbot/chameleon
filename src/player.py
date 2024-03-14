@@ -16,6 +16,8 @@ class Player(BaseModel):
     """The name of the player."""
     player_id: str
     """The id of the player."""
+    game_id: str
+    """The id of the game the player is in."""
     interface: BaseAgentInterface = Field(exclude=True)
     """The interface used by the agent controlling the player to communicate with the game."""
     message_level: str = "info"
@@ -43,7 +45,7 @@ class Player(BaseModel):
         player_id = f"{game_id}-observer"
         interface = interface_type(agent_id=player_id)
 
-        return cls(name=name, player_id=player_id, interface=interface, message_level=message_level)
+        return cls(name=name, player_id=player_id, game_id=game_id, interface=interface, message_level=message_level)
 
 
 class PlayerSubclass(Player):
