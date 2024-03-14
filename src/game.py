@@ -16,7 +16,7 @@ class Game(BaseModel):
 
     players: List[Player] = Field(exclude=True)
     """The players in the game."""
-    observer: Optional[Player]
+    observer: Optional[Player] = Field(exclude=True)
     """An observer who can see all public messages, but doesn't actually play."""
     game_id: str
     """The unique id of the game."""
