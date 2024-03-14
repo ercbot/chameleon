@@ -1,4 +1,5 @@
 from collections import Counter
+from typing import ClassVar
 
 from game_utils import random_index
 from output_formats import *
@@ -9,37 +10,39 @@ from game import Game
 
 # Default Values
 NUMBER_OF_PLAYERS = 6
-WINNING_SCORE = 6
+WINNING_SCORE = 7
+AVAILABLE_ANIMALS = ["Dog", "Cat", "Mouse", "Hamster", "Monkey", "Rabbit", "Fox", "Bear", "Panda", "Koala", "Tiger",
+                     "Lion", "Cow", "Pig", "Frog", "Owl", "Duck", "Chicken", "Butterfly", "Turtle", "Snake", "Octopus",
+                     "Squid", "Hedgehog", "Elephant", "Rhinoceros", "Zebra", "Crocodile", "Whale", "Dolphin", "Camel",
+                     "Giraffe", "Deer", "Gorilla", "Goat", "Llama", "Horse", "Unicorn", "Flamingo", "Skunk", "Shark"]
 
 
 class ChameleonGame(Game):
     """The main game class, handles the game logic and player interactions."""
 
-    number_of_players = NUMBER_OF_PLAYERS
+    # Defaults
 
-    winning_score = WINNING_SCORE
+    winning_score: int = WINNING_SCORE
     """The Number of points required to win the game."""
-    available_animals = ["Dog", "Cat", "Mouse", "Hamster", "Monkey", "Rabbit", "Fox", "Bear", "Panda", "Koala", "Tiger", "Lion", "Cow", "Pig", "Frog", "Owl", "Duck", "Chicken", "Butterfly", "Turtle", "Snake", "Octopus", "Squid", "Hedgehog", "Elephant", "Rhinoceros", "Zebra", "Crocodile", "Whale", "Dolphin", "Camel", "Giraffe", "Deer", "Gorilla", "Goat", "Llama", "Horse", "Unicorn", "Flamingo", "Skunk", "Shark"]
+    available_animals: List[str] = Field(AVAILABLE_ANIMALS, exclude=True)
     """The list of animals that can be chosen as the secret animal."""
+    chameleon_ids: List[str] = []
+    """Record of which player was the chameleon for each round."""
+    herd_animals: List[str] = []
+    """Record of what animal was the herd animal for each round."""
+    all_animal_descriptions: List[List[dict]] = []
+    """Record of the animal descriptions each player has given for each round."""
+    chameleon_guesses: List[str] = []
+    """Record of what animal the chameleon guessed for each round."""
+    herd_vote_tallies: List[List[dict]] = []
+    """Record of the votes of each herd member for the chameleon for each round."""
 
-    def __init__(self, *args, **kwargs):
+    # Class Variables
 
-        super().__init__(*args, **kwargs)
-
-        # Convert the Players to ChameleonPlayers
-        self.players: List[ChameleonPlayer] = [ChameleonPlayer.from_player(player) for player in self.players]
-
-        # Instance Variables
-        self.chameleon_ids: List[str] = []
-        """Record of which player was the chameleon for each round."""
-        self.herd_animals: List[str] = []
-        """Record of what animal was the herd animal for each round."""
-        self.all_animal_descriptions: List[List[dict]] = []
-        """Record of the animal descriptions each player has given for each round."""
-        self.chameleon_guesses: List[str] = []
-        """Record of what animal the chameleon guessed for each round."""
-        self.herd_vote_tallies: List[List[dict]] = []
-        """Record of the votes of each herd member for the chameleon for each round."""
+    number_of_players: ClassVar[int] = NUMBER_OF_PLAYERS
+    """The number of players in the game."""
+    player_class: ClassVar[Type[Player]] = ChameleonPlayer
+    """The class of the player used in the game."""
 
     @property
     def chameleon(self) -> ChameleonPlayer:

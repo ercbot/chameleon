@@ -1,36 +1,41 @@
-from typing import Optional, Type, List
+from typing import Optional, Type, List, ClassVar
+
+from pydantic import BaseModel, Field
 
 from game_utils import *
-from player import Player
 from message import Message, MessageType
 from agent_interfaces import HumanAgentCLI, OpenAIAgentInterface, HumanAgentInterface
+from player import Player
 from data_collection import save
 
 # Abstracting the Game Class is a WIP so that future games can be added
-class Game:
+class Game(BaseModel):
     """Base class for all games."""
 
-    number_of_players: int
+    # Required
+
+    players: List[Player] = Field(exclude=True)
+    """The players in the game."""
+    observer: Optional[Player]
+    """An observer who can see all public messages, but doesn't actually play."""
+    game_id: str
+    """The unique id of the game."""
+
+    # Default
+
+    winner_id: str | None = None
+    """The id of the player who has won the game."""
+    game_state: str = Field("game_start", exclude=True)
+    """Keeps track of the current state of the game."""
+    awaiting_input: bool = Field(False, exclude=True)
+    """Whether the game is currently awaiting input from a player."""
+
+    # Class Variables
+
+    number_of_players: ClassVar[int]
     """The number of players in the game."""
-
-    def __init__(
-            self,
-            game_id: str,
-            players: List[Player],
-            observer: Optional[Player] = None
-    ):
-        self.players: List[Player] = players
-        """The players in the game."""
-        self.observer: Optional[Player] = observer
-        """An observer who can see all public messages, but doesn't actually play."""
-        self.game_id = game_id
-        """The unique id of the game."""
-
-        self.winner_id: str | None = None
-        """The id of the player who has won the game."""
-        self.game_state: str = "game_start"
-        """Keeps track of the current state of the game."""
-        self.awaiting_input: bool = False
+    player_class: ClassVar[Type[Player]] = Player
+    """The class of the player used in the game."""
 
     def player_from_id(self, player_id: str) -> Player:
         """Returns a player from their ID."""
@@ -89,6 +94,10 @@ class Game:
         for player in self.players:
             save(player)
 
+        save(self)
+
+
+
     @classmethod
     def from_human_name(
             cls, human_name: str = None,
@@ -126,7 +135,7 @@ class Game:
                 player_dict["interface"] = OpenAIAgentInterface(agent_id=player_id)
                 player_dict["message_level"] = "info"
 
-            players.append(Player(**player_dict))
+            players.append(cls.player_class(**player_dict))
 
         # Add Observer - an Agent who can see all the messages, but doesn't actually play
         if human_index is None:
@@ -134,7 +143,7 @@ class Game:
         else:
             observer = None
 
-        return cls(game_id, players, observer)
+        return cls(game_id=game_id, players=players, observer=observer)
 
 
 

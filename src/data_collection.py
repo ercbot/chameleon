@@ -4,8 +4,8 @@ from typing import NewType
 
 import pydantic
 
-import message
 import player
+import message
 
 from pydantic import BaseModel
 
@@ -26,10 +26,14 @@ def save(log_object: Model):
 
 
 def get_log_file(log_object: Model) -> str:
+    from game import Game
+
     if isinstance(log_object, message.AgentMessage):
         log_file = "messages.jsonl"
     elif isinstance(log_object, player.Player):
         log_file = "players.jsonl"
+    elif isinstance(log_object, Game):
+        log_file = "games.jsonl"
     else:
         raise ValueError(f"Unknown log object type: {type(log_object)}")
 
