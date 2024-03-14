@@ -3,7 +3,7 @@ from typing import Optional, Type, List, ClassVar
 from pydantic import BaseModel, Field
 
 from game_utils import *
-from message import Message, MessageType
+from message import Message, MessageType, AgentMessage
 from agent_interfaces import HumanAgentCLI, OpenAIAgentInterface, HumanAgentInterface
 from player import Player
 from data_collection import save
@@ -14,12 +14,12 @@ class Game(BaseModel):
 
     # Required
 
-    players: List[Player] = Field(exclude=True)
-    """The players in the game."""
-    observer: Optional[Player] = Field(exclude=True)
-    """An observer who can see all public messages, but doesn't actually play."""
     game_id: str
     """The unique id of the game."""
+    players: List[Player] = Field(exclude=True)
+    """The players in the game."""
+    observer: Optional[Player]
+    """An observer who can see all public messages, but doesn't actually play."""
 
     # Default
 
@@ -48,7 +48,7 @@ class Game(BaseModel):
     def game_message(
             self,
             content: str,
-            recipient: Optional[Player] = None,  # If None, message is broadcast to all players
+            recipient: Player | List[Player] | None = None,  # If None, message is broadcast to all players
             exclude: bool = False,  # If True, the message is broadcast to all players except the chosen player
             message_type: MessageType = "info"
     ):
@@ -58,14 +58,28 @@ class Game(BaseModel):
         If exclude is True, the message is broadcast to all players except the recipient.
         Some message types are only available to player with access (e.g. verbose, debug).
         """
-        message = Message(type=message_type, content=content)
-
         if exclude or not recipient:
-            for player in self.players + [self.observer] if self.observer else self.players:
-                if player != recipient and player.can_receive_message(message_type):
-                    player.interface.add_message(message)
+            # These are public messages, exclude is used to exclude the sender from the recipient list.
+            recipients = [player for player in self.players if player != recipient]
+            if self.observer:
+                recipients.append(self.observer)
         else:
-            recipient.interface.add_message(message)
+            if isinstance(recipient, Player):
+                recipients = [recipient]
+            else:
+                recipients = recipient
+
+        message = Message(type=message_type, content=content)
+        recipient_ids = []
+
+        for player in recipients:
+            if player.can_receive_message(message_type):
+                player.interface.add_message(message)
+                recipient_ids.append(player.player_id)
+
+        agent_message = AgentMessage.from_message(message, recipient_ids, self.game_id)
+        save(agent_message)
+
 
     def verbose_message(self, content: str, **kwargs):
         """
@@ -96,8 +110,6 @@ class Game(BaseModel):
 
         save(self)
 
-
-
     @classmethod
     def from_human_name(
             cls, human_name: str = None,
@@ -122,19 +134,21 @@ class Game(BaseModel):
         players = []
 
         for i in range(0, cls.number_of_players):
-            player_id = f"{game_id}-{i + 1}"
-            player_dict = {"game_id": game_id, "player_id": player_id}
+            player_dict = {"game_id": game_id}
 
             if human_index == i:
                 player_dict["name"] = human_name
-                player_dict["interface"] = human_interface(agent_id=player_id)
+                player_id = f"{game_id}-human"
+                player_dict["interface"] = human_interface(agent_id=player_id, game_id=game_id)
                 player_dict["message_level"] = human_message_level
             else:
                 player_dict["name"] = ai_names.pop()
+                player_id = f"{game_id}-{player_dict['name']}"
                 # all AI players use the OpenAI interface for now - this can be changed in the future
-                player_dict["interface"] = OpenAIAgentInterface(agent_id=player_id)
+                player_dict["interface"] = OpenAIAgentInterface(agent_id=player_id, game_id=game_id)
                 player_dict["message_level"] = "info"
 
+            player_dict["player_id"] = player_id
             players.append(cls.player_class(**player_dict))
 
         # Add Observer - an Agent who can see all the messages, but doesn't actually play

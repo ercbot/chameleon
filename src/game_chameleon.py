@@ -50,6 +50,11 @@ class ChameleonGame(Game):
         return self.player_from_id(self.chameleon_ids[-1])
 
     @property
+    def chameleon_id(self) -> str:
+        """Returns the current chameleon's id."""
+        return self.chameleon_ids[-1]
+
+    @property
     def herd_animal(self) -> str:
         """Returns the current herd animal."""
         return self.herd_animals[-1]
@@ -146,16 +151,29 @@ class ChameleonGame(Game):
 
         # Assign Roles
         chameleon_index = random_index(len(self.players))
-        self.chameleon_ids.append(self.players[chameleon_index].player_id)
+        chameleon = self.players[chameleon_index]
+
+        self.chameleon_ids.append(chameleon.player_id)
+
+        self.game_message(fetch_prompt("assign_chameleon"), chameleon)
+
+        herd = []
+        for i, player in enumerate(self.players):
+            if i == chameleon_index:
+                player.assign_role("chameleon")
+                self.debug_message(f"{player.name} is the Chameleon!")
+            else:
+                player.assign_role("herd")
+                herd.append(player)
+
+        self.game_message(format_prompt("assign_herd", herd_animal=herd_animal), herd)
 
         for i, player in enumerate(self.players):
             if i == chameleon_index:
                 player.assign_role("chameleon")
-                self.game_message(fetch_prompt("assign_chameleon"), player)
                 self.debug_message(f"{player.name} is the Chameleon!")
             else:
                 player.assign_role("herd")
-                self.game_message(format_prompt("assign_herd", herd_animal=herd_animal), player)
 
         # Empty Animal Descriptions
         self.all_animal_descriptions.append([])

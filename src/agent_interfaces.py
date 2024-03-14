@@ -19,6 +19,9 @@ class BaseAgentInterface(BaseModel):
 
     agent_id: str
     """The id of the agent."""
+    game_id: str
+    """The id of the game the agent is in."""
+
     log_messages: bool = True
     """Whether to log messages or not."""
     messages: List[Message] = []
@@ -32,10 +35,7 @@ class BaseAgentInterface(BaseModel):
 
     def add_message(self, message: Message):
         """Adds a message to the message history, without generating a response."""
-        bound_message = AgentMessage.from_message(message, self.agent_id, len(self.messages))
-        if self.log_messages:
-            save(bound_message)
-        self.messages.append(bound_message)
+        self.messages.append(message)
 
     # Respond To methods - These take a message as input and generate a response
 
@@ -64,6 +64,7 @@ class BaseAgentInterface(BaseModel):
         if content:
             response = Message(type="agent", content=content)
             self.add_message(response)
+            save(AgentMessage.from_message(response, [self.agent_id], self.game_id))
             return response
         else:
             return None
@@ -128,7 +129,7 @@ class OpenAIAgentInterface(BaseAgentInterface):
     """An interface that uses the OpenAI API (or compatible 3rd parties) to generate responses."""
     model_config = ConfigDict(protected_namespaces=())
 
-    model_name: str ="gpt-3.5-turbo"
+    model_name: str = "gpt-3.5-turbo"
     """The name of the model to use for generating responses."""
     client: Any = Field(default_factory=OpenAI, exclude=True)
     """The OpenAI client used to generate responses."""

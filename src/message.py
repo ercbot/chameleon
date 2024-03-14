@@ -1,7 +1,16 @@
-from typing import Literal
-from pydantic import BaseModel, computed_field
+from typing import Literal, List
+from pydantic import BaseModel, computed_field, Field
 
 MessageType = Literal["prompt", "info", "agent", "retry", "error", "format", "verbose", "debug"]
+
+message_number = 0
+
+
+def next_message_number():
+    global message_number
+    current_message_number = message_number
+    message_number += 1
+    return current_message_number
 
 
 class Message(BaseModel):
@@ -37,24 +46,26 @@ class Message(BaseModel):
 
 
 class AgentMessage(Message):
-    """A message bound to a specific agent, this happens when an agent receives a message from the game."""
+    """A message that has been sent to 1 or more agents."""
 
-    agent_id: str
-    """The id of the controller that the message was sent by/to."""
-    message_number: int
+    agent_ids: List[str]
+    """The id/ids of the agent that the message was sent by/to."""
+    game_id: str
+    """The id of the game the message was sent during."""
+    message_number: int = Field(default_factory=next_message_number)
     """The number of the message, indicating the order in which it was sent."""
 
     @computed_field
     def message_id(self) -> str:
         """Returns the message id in the format used by the LLM."""
-        return f"{self.agent_id}-{self.message_number}"
+        return f"{self.game_id}-{self.message_number}"
 
     @classmethod
-    def from_message(cls, message: Message, agent_id: str, message_number: int) -> "AgentMessage":
+    def from_message(cls, message: Message, agent_ids: List[str], game_id: str) -> "AgentMessage":
         """Creates an AgentMessage from a Message."""
         return cls(
             type=message.type,
             content=message.content,
-            agent_id=agent_id,
-            message_number=message_number
+            agent_ids=agent_ids,
+            game_id=game_id
         )

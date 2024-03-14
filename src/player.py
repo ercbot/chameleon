@@ -43,7 +43,7 @@ class Player(BaseModel):
         """Creates an observer player."""
         name = "Observer"
         player_id = f"{game_id}-observer"
-        interface = interface_type(agent_id=player_id)
+        interface = interface_type(agent_id=player_id, game_id=game_id)
 
         return cls(name=name, player_id=player_id, game_id=game_id, interface=interface, message_level=message_level)
 
