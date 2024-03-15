@@ -130,6 +130,8 @@ class ChameleonGame(Game):
 
         # Phase III: The Herd Votes for who they think the Chameleon is
         if self.game_state == "herd_vote":
+            if not self.awaiting_input:
+                self.verbose_message("The Herd is voting...")
             for current_player in self.players:
                 if current_player.role == "herd" and current_player.player_id not in [vote['voter_id'] for vote in
                                                                                       self.herd_vote_tally]:
@@ -205,7 +207,7 @@ class ChameleonGame(Game):
         """Handles the Chameleon's turn to guess the secret animal."""
         if not self.awaiting_input:
             self.game_message("All players have spoken. The Chameleon will now guess the secret animal...")
-            self.verbose_message("The Chameleon is thinking...", recipient=chameleon, exclude=True)
+            self.verbose_message("The Chameleon is guessing...", recipient=chameleon, exclude=True)
             player_responses = self.format_animal_descriptions(exclude=self.chameleon)
             self.game_message(format_prompt("chameleon_guess_animal", player_responses=player_responses),
                               self.chameleon)
@@ -225,7 +227,6 @@ class ChameleonGame(Game):
     def player_turn_herd_vote(self, player: Player):
         """Handles a player's turn to vote for the Chameleon."""
         if not self.awaiting_input:
-            self.verbose_message(f"{player.name} is thinking...", recipient=player, exclude=True)
             player_responses = self.format_animal_descriptions(exclude=player)
             self.game_message(format_prompt("vote", player_responses=player_responses), player)
 
