@@ -84,7 +84,8 @@ text-align: center;
 }
 </style>
 <div class="footer">
-<p>Created by <a href="https://huggingface.co/ericbotti" target="_blank">Eric Botti</a></p>
+<p style="margin: 0;">Created by <a href="https://huggingface.co/ericbotti" target="_blank">Eric Botti</a></p>
+<small>Your responses may be collected for research purposes</small>
 </div>
 """
 st.markdown(footer, unsafe_allow_html=True)

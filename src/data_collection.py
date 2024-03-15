@@ -7,34 +7,44 @@ import pydantic
 import player
 import message
 
+from pymongo import MongoClient
 from pydantic import BaseModel
 
-COLLECT_DATA = os.environ.get("COLLECT_DATA", "true").upper() == "TRUE"
+
+DATA_COLLECTION_MODE = os.environ.get("DATA_COLLECTION_MODE", "JSONL")
+
+MONGODB_CONNECTION_STRING = os.environ.get("MONGODB_CONNECTION_STRING")
+DB_NAME = os.environ.get("MONGODB_NAME")
 
 Model = NewType("Model", BaseModel)
 
 
-data_dir = pathlib.Path(__file__).parent.parent / "data"
-
-
 def save(log_object: Model):
-    if COLLECT_DATA:
-        log_file = get_log_file(log_object)
+    collection = get_collection(log_object)
+
+    if DATA_COLLECTION_MODE.upper() == "JSONL":
+        data_dir = pathlib.Path(__file__).parent.parent / "data"
+        log_file = os.path.join(data_dir, f"{collection}.jsonl")
 
         with open(log_file, "a+") as f:
             f.write(log_object.model_dump_json() + "\n")
 
+    if DATA_COLLECTION_MODE.upper() == "MONGODB":
+        client = MongoClient(MONGODB_CONNECTION_STRING)
+        db = client[DB_NAME]
+        db[collection].insert_one(log_object.model_dump())
 
-def get_log_file(log_object: Model) -> str:
+
+def get_collection(log_object: Model) -> str:
     from game import Game
 
     if isinstance(log_object, message.AgentMessage):
-        log_file = "messages.jsonl"
+        collection = "messages"
     elif isinstance(log_object, player.Player):
-        log_file = "players.jsonl"
+        collection = "players"
     elif isinstance(log_object, Game):
-        log_file = "games.jsonl"
+        collection = "games"
     else:
         raise ValueError(f"Unknown log object type: {type(log_object)}")
 
-    return os.path.join(data_dir, log_file)
+    return collection
