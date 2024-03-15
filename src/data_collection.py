@@ -22,6 +22,8 @@ Model = NewType("Model", BaseModel)
 def save(log_object: Model):
     collection = get_collection(log_object)
 
+    print(DATA_COLLECTION_MODE)
+
     if DATA_COLLECTION_MODE.upper() == "JSONL":
         data_dir = pathlib.Path(__file__).parent.parent / "data"
         log_file = os.path.join(data_dir, f"{collection}.jsonl")
