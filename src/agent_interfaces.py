@@ -42,6 +42,7 @@ class BaseAgentInterface(BaseModel):
     def respond_to(self, message: Message) -> Message:
         """Take a message as input and return a response. Both the message and the response are added to history."""
         self.add_message(message)
+        save(AgentMessage.from_message(message, [self.agent_id], self.game_id))
         response = self.generate_response()
         return response
 
