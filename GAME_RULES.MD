@@ -1,4 +1,4 @@
-## Game Rules
+# Game Rules
 
 You are playing a social deduction game where every player pretends the be the same animal. 
 During the round each player gets a turn to describe themselves using an "I"-statement as if they were the animal. 
