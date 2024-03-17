@@ -6,7 +6,7 @@ from streamlit import session_state
 from game_chameleon import ChameleonGame
 from agent_interfaces import HumanAgentInterface
 from message import Message
-from prompts import fetch_prompt, format_prompt
+from prompts import fetch_prompt
 
 st.set_page_config(layout="wide", page_title="Chameleon")
 
@@ -16,6 +16,9 @@ def display_message(message: Message):
         messages_container.markdown(f":green[{message.content}]")
     elif message.type == "debug":
         messages_container.markdown(f":orange[DEBUG: {message.content}]")
+    elif message.type == "system":
+        # Don't display system message as it is displayed in the "How to Play" expander
+        pass
     else:
         messages_container.markdown(f"{message.content}")
 
@@ -53,6 +56,10 @@ with center:
     messages_container = st.container()
 
     messages_container.write("Welcome to Chameleon! A social deduction game powered by LLMs.")
+
+    rules_expander = messages_container.expander("How to Play", expanded=False)
+
+    rules_expander.markdown(fetch_prompt("game_rules"))
 
     messages_container.write("Enter your name to begin...")
 

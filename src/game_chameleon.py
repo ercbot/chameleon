@@ -80,7 +80,7 @@ class ChameleonGame(Game):
         # Check if the game has not been won
         if self.game_state != "game_end":
             if self.game_state == "game_start":
-                self.game_message(fetch_prompt("game_rules"))
+                self.game_message(fetch_prompt("game_rules"), message_type="system")
                 self.game_state = "setup_round"
             if self.game_state == "setup_round":
                 self.setup_round()

@@ -1,7 +1,7 @@
 from typing import Literal, List
 from pydantic import BaseModel, computed_field, Field
 
-MessageType = Literal["prompt", "info", "agent", "retry", "error", "format", "verbose", "debug"]
+MessageType = Literal["prompt", "info", "agent", "retry", "error", "format", "verbose", "debug", "system"]
 
 message_number = 0
 
@@ -30,7 +30,9 @@ class Message(BaseModel):
         # This can be counterintuitive since they can be controlled by either human or ai
         # Further, The programmatic messages from the game are always "user"
 
-        if self.type != "agent":
+        if self.type != "system":
+            return "system"
+        elif self.type != "agent":
             return "user"
         else:
             return "assistant"

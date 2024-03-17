@@ -10,11 +10,21 @@ def format_prompt(prompt_name, **kwargs):
 
 _game_rules = '''\
 You are playing a social deduction game where every player pretends the be the same animal. 
-During the round players go around the room and make an "I"-statement as if they were the animal. 
-All players know what animal they are pretending to be, except one who is known as the Chameleon. 
-The Chameleon and must blend in by providing details about the animal using context from other players. 
-The other players must be careful not to give away too much information with their responses so that Chameleon cannot guess the animal. 
-After all players have spoken, they vote on who they think the Chameleon is. \
+During the round each player gets a turn to describe themselves using an "I"-statement as if they were the animal. 
+All but one of players know what animal they are pretending to be, collectively these players are called the Herd.
+The remaining player, known as the Chameleon, does not know what animal the others are pretending to be.
+The Chameleon must blend in by providing details about the animal using context from other players. 
+The Herd must be careful not to give away too much information with their responses so that Chameleon deduce the animal. 
+
+After all players have spoken, two thing will happen:
+1. The Chameleon will guess what animal the other players are pretending to be
+2. The Herd will vote on who they think the Chameleon is.
+ 
+The game is played in rounds, and the first player to reach 7 points wins. Points are awarded during a round as follows:
+- If the Chameleon remains undetected, they get +1 point
+- If the Chameleon guesses the animal correctly, they get +1 point
+- If a member of the Herd votes for the Chameleon, they get +1 point
+- If the Chameleon is unable to guess the animal, each member of the Herd gets +1 point
 '''
 
 _assign_herd = """\
@@ -22,7 +32,7 @@ You are a **{herd_animal}**, keep this secret at all costs and figure which play
 """
 
 _assign_chameleon = """\
-"You are the **Chameleon**, remain undetected and guess what animal the others are pretending to be"
+You are the **Chameleon**, remain undetected and guess what animal the others are pretending to be
 """
 
 _player_describe_animal = """It's your turn to describe yourself. Remember:
@@ -40,7 +50,7 @@ Your Guess:
 """
 
 _vote_prompt = """\
-Now it is time to vote. Choose from the other players who you think the Chameleon is.
+It's your turn to vote. Choose from the other players who you think the Chameleon is.
 Player Responses:
 {player_responses}
 Your Vote:
