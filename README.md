@@ -26,3 +26,8 @@ If you want to run the game locally, you can clone the repository and run the ga
 2. **Using the Streamlit App**:
     - Run `streamlit run src/app.py` from the root directory
 
+## Updated Version
+
+During Buildspace Season 5 I expanded this project to have a pretty frontend and hosted it on a VPS. You can find that work here:
+
+https://github.com/ercbot/forbreakfast_buildspace
